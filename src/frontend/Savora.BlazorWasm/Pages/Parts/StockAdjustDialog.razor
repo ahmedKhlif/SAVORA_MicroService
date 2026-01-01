@@ -1,0 +1,67 @@
+@inject IPartService PartService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            <strong>@Part.Name</strong> - Stock actuel: <strong>@Part.StockQuantity</strong>
+        </MudText>
+        
+        <MudNumericField @bind-Value="_quantity" Label="@(IsAdd ? "Quantité à ajouter" : "Quantité à retirer")" 
+                         Variant="Variant.Outlined" FullWidth="true" Min="1" />
+        
+        <MudTextField @bind-Value="_reason" Label="Motif (optionnel)" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="@(IsAdd ? Color.Success : Color.Warning)" Variant="Variant.Filled" 
+                   OnClick="Submit" Disabled="@(_isLoading || _quantity < 1)">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @(IsAdd ? "Ajouter" : "Retirer")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public PartDto Part { get; set; } = null!;
+    [Parameter] public bool IsAdd { get; set; }
+
+    private int _quantity = 1;
+    private string _reason = "";
+    private bool _isLoading = false;
+
+    private async Task Submit()
+    {
+        _isLoading = true;
+        try
+        {
+            var adjustedQuantity = IsAdd ? _quantity : -_quantity;
+            var result = await PartService.AdjustStockAsync(Part.Id, adjustedQuantity, _reason);
+            
+            if (result.Success)
+            {
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de l'ajustement du stock", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

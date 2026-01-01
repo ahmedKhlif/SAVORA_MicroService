@@ -1,0 +1,905 @@
+@inject IDashboardService DashboardService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageHeader Title="Dashboard SAV" Subtitle="Vue d'ensemble du service après-vente" Icon="bar-chart-2">
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-outline-primary" @onclick="RefreshDashboard" title="Actualiser" disabled="@_isRefreshing">
+            @if (_isRefreshing)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            else
+            {
+                <i data-feather="refresh-cw" class="me-1"></i>
+            }
+            Actualiser
+        </button>
+        <button type="button" class="btn btn-outline-success" @onclick="ExportToExcel" title="Exporter en Excel">
+            <i data-feather="download" class="me-1"></i> Excel
+        </button>
+        <button type="button" class="btn btn-outline-danger" @onclick="ExportToPdf" title="Exporter en PDF">
+            <i data-feather="file-text" class="me-1"></i> PDF
+        </button>
+    </div>
+</PageHeader>
+
+@if (_isLoading)
+{
+    <div class="row">
+        @for (int i = 0; i < 6; i++)
+        {
+            <div class="col-sm-6 col-xl-2">
+                <div class="card">
+                    <div class="card-body placeholder-glow">
+                        <span class="placeholder col-6"></span>
+                        <span class="placeholder col-4 mt-2"></span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div id="dashboard-content">
+    <!-- KPI Cards Row 1 - Main Metrics -->
+    <div class="row">
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("/reclamations"))">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Réclamations</h5>
+                        <i data-feather="file-text" class="text-primary" style="width: 20px; height: 20px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0 text-primary">@_dashboard.TotalReclamations</h1>
+                    <small class="text-muted">Total</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #3B82F6;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Nouvelles</h5>
+                        <span class="badge bg-primary">@_dashboard.NewReclamations</span>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #3B82F6;">@_dashboard.NewReclamations</h1>
+                    <small class="text-muted">En attente</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #F59E0B;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">En cours</h5>
+                        <i data-feather="refresh-cw" style="color: #F59E0B; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #F59E0B;">@_dashboard.InProgressReclamations</h1>
+                    <small class="text-muted">Traitement</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #DC2626;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">En retard</h5>
+                        @if (_dashboard.OverdueReclamations > 0)
+                        {
+                            <span class="badge bg-danger">⚠️</span>
+                        }
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #DC2626;">@_dashboard.OverdueReclamations</h1>
+                    <small class="text-muted">SLA dépassé</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #16A34A;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Résolues</h5>
+                        <i data-feather="check-circle" style="color: #16A34A; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #16A34A;">@_dashboard.ClosedReclamations</h1>
+                    <small class="text-muted">Clôturées</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #06B6D4; cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("/interventions"))">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Interventions</h5>
+                        <i data-feather="tool" style="color: #06B6D4; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #06B6D4;">@_dashboard.TotalInterventions</h1>
+                    <small class="text-muted">Total</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards Row 2 - Performance Metrics -->
+    <div class="row mt-3">
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #8B5CF6;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Taux résolution</h5>
+                        <i data-feather="target" style="color: #8B5CF6; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #8B5CF6;">@_dashboard.ResolutionRate.ToString("F1")%</h1>
+                    <small class="text-muted">Réclamations clôturées</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #10B981;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Conformité SLA</h5>
+                        <i data-feather="shield-check" style="color: #10B981; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #10B981;">@_dashboard.SlaComplianceRate.ToString("F1")%</h1>
+                    <small class="text-muted">Dans les délais</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #EC4899;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Aujourd'hui</h5>
+                        <i data-feather="calendar" style="color: #EC4899; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #EC4899;">@_dashboard.TodayReclamations</h1>
+                    <small class="text-muted">Nouvelles réclamations</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #F59E0B; cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("/clients"))">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Clients</h5>
+                        <i data-feather="users" style="color: #F59E0B; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #F59E0B;">@_dashboard.TotalClients</h1>
+                    <small class="text-muted">@_dashboard.ActiveClients actifs</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #6366F1; cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("/articles"))">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Articles</h5>
+                        <i data-feather="package" style="color: #6366F1; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #6366F1;">@_dashboard.TotalArticles</h1>
+                    <small class="text-muted">Total articles</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-2">
+            <div class="card hover-lift" style="border-left: 4px solid #14B8A6; cursor: pointer;" @onclick="@(() => Navigation.NavigateTo("/parts"))">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-muted mb-0">Pièces</h5>
+                        <i data-feather="settings" style="color: #14B8A6; width: 18px; height: 18px;"></i>
+                    </div>
+                    <h1 class="mt-1 mb-0" style="color: #14B8A6;">@_dashboard.TotalParts</h1>
+                    <small class="text-muted">@_dashboard.LowStockPartsCount en stock bas</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Status Chart -->
+        <div class="col-12 col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Réclamations par statut</h5>
+                </div>
+                <div class="card-body">
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Priority Chart -->
+        <div class="col-12 col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Réclamations par priorité</h5>
+                </div>
+                <div class="card-body">
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="priorityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Charts Row -->
+    <div class="row">
+        <!-- Monthly Reclamations Chart -->
+        <div class="col-12 col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Évolution des réclamations</h5>
+                </div>
+                <div class="card-body">
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="monthlyReclamationsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Revenue Chart -->
+        <div class="col-12 col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Évolution des revenus</h5>
+                </div>
+                <div class="card-body">
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="monthlyRevenueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row">
+        <!-- Revenue Card -->
+        <div class="col-12 col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Revenus</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <span class="text-muted d-block small">Ce mois</span>
+                            <h4 class="text-success mb-0">@_dashboard.CurrentMonthRevenue.ToString("N2") TND</h4>
+                            @if (_dashboard.RevenueGrowth != 0)
+                            {
+                                <small class="@(_dashboard.RevenueGrowth > 0 ? "text-success" : "text-danger")">
+                                    <i data-feather="@(_dashboard.RevenueGrowth > 0 ? "trending-up" : "trending-down")" style="width: 12px; height: 12px;"></i>
+                                    @Math.Abs(_dashboard.RevenueGrowth).ToString("F1")% vs mois dernier
+                                </small>
+                            }
+                        </div>
+                        <i data-feather="trending-up" class="text-success" style="width: 32px; height: 32px;"></i>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Total cumulé</span>
+                        <h5 class="mb-0 fw-bold">@_dashboard.TotalRevenue.ToString("N2") TND</h5>
+                    </div>
+                    @if (_dashboard.AverageInterventionAmount > 0)
+                    {
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted small">Moyenne intervention</span>
+                            <span class="badge bg-info">@_dashboard.AverageInterventionAmount.ToString("N2") TND</span>
+                        </div>
+                    }
+                    @if (_dashboard.AverageResolutionDays > 0)
+                    {
+                        <hr />
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">Temps moyen de résolution</span>
+                            <span class="badge bg-info">@_dashboard.AverageResolutionDays.ToString("F1") jours</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Interventions Card -->
+        <div class="col-12 col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Interventions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Planifiées</span>
+                        <span class="badge bg-info">@_dashboard.PlannedInterventions</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">En cours</span>
+                        <span class="badge bg-warning">@_dashboard.InProgressInterventions</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Terminées</span>
+                        <span class="badge bg-success">@_dashboard.CompletedInterventions</span>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Aujourd'hui</span>
+                        <span class="badge bg-primary">@_dashboard.TodayInterventions</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Gratuites / Payantes</span>
+                        <span>@_dashboard.FreeInterventions / @_dashboard.PaidInterventions</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technician Workload Chart -->
+        @if (_dashboard.TechnicianWorkloads.Any())
+        {
+            <div class="col-12 col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Charge des techniciens</h5>
+                    </div>
+                    <div class="card-body">
+                        <div style="height: 250px; position: relative;">
+                            <canvas id="technicianWorkloadChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Articles by Category -->
+            @if (_dashboard.ArticlesByCategory.Any())
+            {
+                <div class="col-12 col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Articles par catégorie</h5>
+                        </div>
+                        <div class="card-body">
+                            <div style="height: 250px; position: relative;">
+                                <canvas id="articlesCategoryChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <!-- Additional Stats Row -->
+    <div class="row">
+        <!-- Top Clients -->
+        @if (_dashboard.TopClients.Any())
+        {
+            <div class="col-12 col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Top Clients</h5>
+                        <a href="/clients" class="btn btn-sm btn-outline-primary">Voir tout</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover my-0">
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Total réclamations</th>
+                                    <th>Actives</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var client in _dashboard.TopClients)
+                                {
+                                    <tr style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo($"/clients/{client.ClientId}"))">
+                                        <td class="fw-medium">@client.ClientName</td>
+                                        <td><span class="badge bg-primary">@client.ReclamationsCount</span></td>
+                                        <td><span class="badge bg-warning">@client.ActiveReclamationsCount</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Parts Statistics -->
+        <div class="col-12 col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Statistiques Pièces Détachées</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0 text-primary">@_dashboard.TotalParts</h3>
+                                <small class="text-muted">Total pièces</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0 text-warning">@_dashboard.LowStockPartsCount</h3>
+                                <small class="text-muted">Stock bas</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0 text-danger">@_dashboard.OutOfStockPartsCount</h3>
+                                <small class="text-muted">Rupture de stock</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0 text-success">@_dashboard.TotalPartsValue.ToString("N2") TND</h3>
+                                <small class="text-muted">Valeur stock</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Low Stock Alerts -->
+    @if (_dashboard.LowStockParts.Any())
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <i data-feather="alert-triangle" class="text-warning me-2"></i>
+                    <h5 class="card-title mb-0">Alertes Stock Bas</h5>
+                </div>
+                <a href="/parts" class="btn btn-sm btn-outline-primary">
+                    Gérer les pièces <i data-feather="arrow-right" class="ms-1"></i>
+                </a>
+            </div>
+            <table class="table table-hover my-0">
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Nom</th>
+                        <th>Stock actuel</th>
+                        <th>Stock minimum</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var part in _dashboard.LowStockParts.Take(5))
+                    {
+                        <tr>
+                            <td><code>@part.PartReference</code></td>
+                            <td>@part.PartName</td>
+                            <td><span class="badge bg-danger">@part.CurrentStock</span></td>
+                            <td>@part.MinStockLevel</td>
+                            <td>
+                                <a href="/parts" class="btn btn-sm btn-outline-primary">Voir</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <!-- Quick Actions -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Actions rapides</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-sm-6 col-md-3">
+                    <a href="/reclamations" class="btn btn-outline-primary w-100">
+                        <i data-feather="list" class="me-2"></i> Réclamations
+                    </a>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <a href="/interventions" class="btn btn-outline-secondary w-100">
+                        <i data-feather="tool" class="me-2"></i> Interventions
+                    </a>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <a href="/technicians" class="btn btn-outline-info w-100">
+                        <i data-feather="users" class="me-2"></i> Techniciens
+                    </a>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <a href="/parts" class="btn btn-outline-warning w-100">
+                        <i data-feather="settings" class="me-2"></i> Pièces
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+}
+
+@code {
+    private SavDashboardDto _dashboard = new();
+    private bool _isLoading = true;
+    private bool _isRefreshing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var result = await DashboardService.GetSavDashboardAsync();
+            if (result.Success && result.Data != null)
+            {
+                _dashboard = result.Data;
+            }
+            else
+            {
+                Snackbar.Add("Impossible de charger les données du tableau de bord", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors du chargement du tableau de bord: {ex.Message}", Severity.Error);
+            // Ensure dashboard is initialized even on error
+            _dashboard = new SavDashboardDto();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "Error initializing feather icons:", ex.Message);
+        }
+        
+        if (!_isLoading && _dashboard != null)
+        {
+            // Small delay to ensure DOM is ready
+            await Task.Delay(100);
+            await InitializeCharts();
+        }
+    }
+
+    private async Task InitializeCharts()
+    {
+        // Initialize each chart independently to prevent one error from breaking all charts
+        try
+        {
+            // Status Chart
+            if (_dashboard.ReclamationsByStatus != null && _dashboard.ReclamationsByStatus.Any())
+            {
+                var statusData = _dashboard.ReclamationsByStatus.Select(s => new { status = GetStatusLabel(s.Status), count = s.Count }).ToArray();
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.initStatusChart", "statusChart", statusData);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "Error initializing status chart:", ex.Message);
+        }
+
+        try
+        {
+            // Priority Chart
+            if (_dashboard.ReclamationsByPriority != null && _dashboard.ReclamationsByPriority.Any())
+            {
+                var priorityData = _dashboard.ReclamationsByPriority.Select(p => new { priority = GetPriorityLabel(p.Priority), count = p.Count }).ToArray();
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.initPriorityChart", "priorityChart", priorityData);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "Error initializing priority chart:", ex.Message);
+        }
+
+        try
+        {
+            // Monthly Reclamations Chart - Always initialize
+            if (_dashboard.MonthlyReclamations != null && _dashboard.MonthlyReclamations.Any())
+            {
+                var monthlyData = _dashboard.MonthlyReclamations.Select(m => new { 
+                    month = TranslateMonth(m.Month), 
+                    year = m.Year, 
+                    count = m.Count 
+                }).ToArray();
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.initMonthlyReclamationsChart", "monthlyReclamationsChart", monthlyData);
+            }
+            else
+            {
+                // Initialize with empty data for last 12 months if no data available
+                var last12Months = Enumerable.Range(0, 12)
+                    .Select(i => DateTime.UtcNow.AddMonths(-i))
+                    .Reverse()
+                    .Select(m => new { 
+                        month = TranslateMonth(m.ToString("MMM")), 
+                        year = m.Year, 
+                        count = 0 
+                    }).ToArray();
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.initMonthlyReclamationsChart", "monthlyReclamationsChart", last12Months);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "Error initializing monthly reclamations chart:", ex.Message);
+        }
+
+        try
+        {
+            // Monthly Revenue Chart - Always initialize, even with zero values
+            if (_dashboard.MonthlyRevenueData != null && _dashboard.MonthlyRevenueData.Any())
+            {
+                var revenueData = _dashboard.MonthlyRevenueData.Select(r => new { 
+                    month = TranslateMonth(r.Month), 
+                    year = r.Year, 
+                    amount = r.Amount 
+                }).ToArray();
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.initMonthlyRevenueChart", "monthlyRevenueChart", revenueData);
+            }
+            else
+            {
+                // Initialize with empty data for last 12 months if no data available
+                var last12Months = Enumerable.Range(0, 12)
+                    .Select(i => DateTime.UtcNow.AddMonths(-i))
+                    .Reverse()
+                    .Select(m => new { 
+                        month = TranslateMonth(m.ToString("MMM")), 
+                        year = m.Year, 
+                        amount = 0m 
+                    }).ToArray();
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.initMonthlyRevenueChart", "monthlyRevenueChart", last12Months);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "Error initializing monthly revenue chart:", ex.Message);
+        }
+
+        try
+        {
+            // Technician Workload Chart
+            if (_dashboard.TechnicianWorkloads != null && _dashboard.TechnicianWorkloads.Any())
+            {
+                var workloadData = _dashboard.TechnicianWorkloads.Select(t => new { 
+                    technicianName = t.TechnicianName, 
+                    activeInterventions = t.ActiveInterventions, 
+                    completedThisMonth = t.CompletedThisMonth 
+                }).ToArray();
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.initTechnicianWorkloadChart", "technicianWorkloadChart", workloadData);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "Error initializing technician workload chart:", ex.Message);
+        }
+
+        try
+        {
+            // Articles by Category Chart
+            if (_dashboard.ArticlesByCategory != null && _dashboard.ArticlesByCategory.Any())
+            {
+                var categoryData = _dashboard.ArticlesByCategory.Select(c => new { 
+                    category = c.Category, 
+                    count = c.Count 
+                }).ToArray();
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.initCategoryChart", "articlesCategoryChart", categoryData);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "Error initializing articles category chart:", ex.Message);
+        }
+    }
+
+    private string GetStatusLabel(string status) => status switch
+    {
+        "New" => "Nouvelle",
+        "InProgress" => "En cours",
+        "PendingIntervention" => "Attente intervention",
+        "InterventionScheduled" => "Intervention planifiée",
+        "UnderIntervention" => "En intervention",
+        "PendingInvoice" => "Attente facture",
+        "Closed" => "Clôturée",
+        "Cancelled" => "Annulée",
+        _ => status
+    };
+
+    private string GetPriorityBadgeClass(string priority) => priority switch
+    {
+        "Urgent" => "bg-danger",
+        "High" => "bg-warning text-dark",
+        "Medium" => "bg-info",
+        "Low" => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private string GetPriorityLabel(string priority) => priority switch
+    {
+        "Urgent" => "Urgente",
+        "High" => "Haute",
+        "Medium" => "Moyenne",
+        "Low" => "Basse",
+        _ => priority
+    };
+
+    private int GetPriorityOrder(string priority) => priority switch
+    {
+        "Urgent" => 4,
+        "High" => 3,
+        "Medium" => 2,
+        "Low" => 1,
+        _ => 0
+    };
+
+    private string TranslateMonth(string month) => month switch
+    {
+        "Jan" => "Jan",
+        "Feb" => "Fév",
+        "Mar" => "Mar",
+        "Apr" => "Avr",
+        "May" => "Mai",
+        "Jun" => "Jun",
+        "Jul" => "Jul",
+        "Aug" => "Aoû",
+        "Sep" => "Sep",
+        "Oct" => "Oct",
+        "Nov" => "Nov",
+        "Dec" => "Déc",
+        _ => month
+    };
+
+    private async Task RefreshDashboard()
+    {
+        _isRefreshing = true;
+        try
+        {
+            var result = await DashboardService.GetSavDashboardAsync();
+            if (result.Success && result.Data != null)
+            {
+                _dashboard = result.Data;
+                // Destroy existing charts before reinitializing
+                await JSRuntime.InvokeVoidAsync("initDashboardCharts.destroyAll");
+                await Task.Delay(100);
+                await InitializeCharts();
+                await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+                Snackbar.Add("Dashboard actualisé", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    private async Task ExportToPdf()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("dashboardExport.exportToPdf", "dashboard-content", $"dashboard-savora-{DateTime.Now:yyyyMMdd-HHmmss}.pdf");
+            Snackbar.Add("Export PDF en cours...", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors de l'export PDF: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ExportToExcel()
+    {
+        try
+        {
+            // Prepare data for export
+            var exportData = new List<object>();
+            
+            // Add KPIs
+            exportData.Add(new { 
+                Catégorie = "KPIs",
+                Libellé = "Total Réclamations",
+                Valeur = _dashboard.TotalReclamations.ToString()
+            });
+            exportData.Add(new { 
+                Catégorie = "KPIs",
+                Libellé = "Nouvelles",
+                Valeur = _dashboard.NewReclamations.ToString()
+            });
+            exportData.Add(new { 
+                Catégorie = "KPIs",
+                Libellé = "En cours",
+                Valeur = _dashboard.InProgressReclamations.ToString()
+            });
+            exportData.Add(new { 
+                Catégorie = "KPIs",
+                Libellé = "Clôturées",
+                Valeur = _dashboard.ClosedReclamations.ToString()
+            });
+            exportData.Add(new { 
+                Catégorie = "KPIs",
+                Libellé = "En retard",
+                Valeur = _dashboard.OverdueReclamations.ToString()
+            });
+            
+            // Add Revenue
+            exportData.Add(new { 
+                Catégorie = "Revenus",
+                Libellé = "Ce mois",
+                Valeur = _dashboard.CurrentMonthRevenue.ToString("N2") + " TND"
+            });
+            exportData.Add(new { 
+                Catégorie = "Revenus",
+                Libellé = "Total",
+                Valeur = _dashboard.TotalRevenue.ToString("N2") + " TND"
+            });
+            
+            // Add Interventions
+            exportData.Add(new { 
+                Catégorie = "Interventions",
+                Libellé = "Total",
+                Valeur = _dashboard.TotalInterventions.ToString()
+            });
+            exportData.Add(new { 
+                Catégorie = "Interventions",
+                Libellé = "Planifiées",
+                Valeur = _dashboard.PlannedInterventions.ToString()
+            });
+            exportData.Add(new { 
+                Catégorie = "Interventions",
+                Libellé = "Terminées",
+                Valeur = _dashboard.CompletedInterventions.ToString()
+            });
+            
+            // Add Status breakdown
+            foreach (var status in _dashboard.ReclamationsByStatus)
+            {
+                exportData.Add(new { 
+                    Catégorie = "Par Statut",
+                    Libellé = GetStatusLabel(status.Status),
+                    Valeur = status.Count.ToString()
+                });
+            }
+            
+            // Add Priority breakdown
+            foreach (var priority in _dashboard.ReclamationsByPriority)
+            {
+                exportData.Add(new { 
+                    Catégorie = "Par Priorité",
+                    Libellé = GetPriorityLabel(priority.Priority),
+                    Valeur = priority.Count.ToString()
+                });
+            }
+
+            await JSRuntime.InvokeVoidAsync("dashboardExport.exportToExcel", exportData.ToArray(), $"dashboard-savora-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
+            Snackbar.Add("Export Excel réussi", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors de l'export Excel: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,407 @@
+@page "/reclamations-calendar"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@implements IDisposable
+@using MudBlazor
+@inject IReclamationService ReclamationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Calendrier des Réclamations</PageTitle>
+
+<PageHeader Title="Calendrier des réclamations" Subtitle="Vue complète de toutes les réclamations" Icon="alert-circle">
+    <button type="button" class="btn btn-outline-primary" @onclick="RefreshCalendar">
+        <i data-feather="refresh-cw" class="me-1"></i> Actualiser
+    </button>
+    <button type="button" class="btn btn-primary" @onclick="CreateNewReclamation">
+        <i data-feather="plus" class="me-1"></i> Nouvelle réclamation
+    </button>
+</PageHeader>
+
+<!-- Stats Cards -->
+<div class="calendar-stats">
+    <div class="calendar-stat-card">
+        <div class="calendar-stat-icon today">
+            <i data-feather="calendar" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="calendar-stat-content">
+            <h3>@_todayCount</h3>
+            <p>Aujourd'hui</p>
+        </div>
+    </div>
+    <div class="calendar-stat-card">
+        <div class="calendar-stat-icon week">
+            <i data-feather="clock" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="calendar-stat-content">
+            <h3>@_weekCount</h3>
+            <p>Cette semaine</p>
+        </div>
+    </div>
+    <div class="calendar-stat-card">
+        <div class="calendar-stat-icon pending">
+            <i data-feather="alert-circle" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="calendar-stat-content">
+            <h3>@_pendingCount</h3>
+            <p>En attente</p>
+        </div>
+    </div>
+    <div class="calendar-stat-card">
+        <div class="calendar-stat-icon overdue">
+            <i data-feather="alert-triangle" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="calendar-stat-content">
+            <h3>@_urgentCount</h3>
+            <p>Urgentes</p>
+        </div>
+    </div>
+</div>
+
+<!-- Legend -->
+<div class="calendar-legend">
+    <div class="calendar-legend-item">
+        <div class="calendar-legend-dot planned"></div>
+        <span>Nouvelle</span>
+    </div>
+    <div class="calendar-legend-item">
+        <div class="calendar-legend-dot inprogress"></div>
+        <span>En cours</span>
+    </div>
+    <div class="calendar-legend-item">
+        <div class="calendar-legend-dot completed"></div>
+        <span>Fermée</span>
+    </div>
+    <div class="calendar-legend-item">
+        <div class="calendar-legend-dot cancelled"></div>
+        <span>Annulée</span>
+    </div>
+    <div class="calendar-legend-item ms-3">
+        <span>🔴</span>
+        <span>Priorité Haute</span>
+    </div>
+    <div class="calendar-legend-item">
+        <span>🟡</span>
+        <span>Priorité Moyenne</span>
+    </div>
+    <div class="calendar-legend-item">
+        <span>🟢</span>
+        <span>Priorité Basse</span>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Statut</label>
+                <select class="form-select" @bind="_selectedStatus" @bind:after="ApplyFilters">
+                    <option value="">Tous les statuts</option>
+                    <option value="New">Nouvelle</option>
+                    <option value="InProgress">En cours</option>
+                    <option value="PendingIntervention">En attente d'intervention</option>
+                    <option value="InterventionScheduled">Intervention planifiée</option>
+                    <option value="UnderIntervention">Sous intervention</option>
+                    <option value="PendingInvoice">En attente de facture</option>
+                    <option value="Closed">Fermée</option>
+                    <option value="Cancelled">Annulée</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Priorité</label>
+                <select class="form-select" @bind="_selectedPriority" @bind:after="ApplyFilters">
+                    <option value="">Toutes les priorités</option>
+                    <option value="High">Haute</option>
+                    <option value="Medium">Moyenne</option>
+                    <option value="Low">Basse</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="button" class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                    <i data-feather="x" class="me-1"></i> Effacer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Calendar Container -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="savora-calendar-container">
+            <div id="calendar-loader">
+                <div class="calendar-loader-spinner"></div>
+            </div>
+            
+            @if (_isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                    <p class="text-muted mt-3">Chargement du calendrier...</p>
+                </div>
+            }
+            else
+            {
+                <div id="savora-calendar" style="padding: 1rem;"></div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ReclamationListDto> _reclamations = new();
+    private bool _isLoading = true;
+    private bool _calendarInitialized = false;
+    private DotNetObjectReference<ReclamationCalendarView>? _dotNetRef;
+    
+    // Stats
+    private int _todayCount = 0;
+    private int _weekCount = 0;
+    private int _pendingCount = 0;
+    private int _urgentCount = 0;
+    
+    // Filters
+    private string _selectedStatus = "";
+    private string _selectedPriority = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReclamations();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+        
+        if (!_isLoading && !_calendarInitialized)
+        {
+            await InitializeCalendar();
+        }
+    }
+
+    private async Task LoadReclamations()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await ReclamationService.GetAllAsync(1, 500);
+            if (result.Success && result.Data != null)
+            {
+                _reclamations = result.Data.Items;
+                CalculateStats();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void CalculateStats()
+    {
+        var today = DateTime.Today;
+        var weekEnd = today.AddDays(7);
+        
+        _todayCount = _reclamations.Count(r => r.CreatedAt.Date == today);
+        _weekCount = _reclamations.Count(r => r.CreatedAt.Date >= today && r.CreatedAt.Date <= weekEnd);
+        _pendingCount = _reclamations.Count(r => r.Status == ReclamationStatus.New || r.Status == ReclamationStatus.PendingIntervention);
+        _urgentCount = _reclamations.Count(r => r.Priority == Priority.High);
+    }
+
+    private async Task InitializeCalendar()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+        
+        var events = GetFilteredEvents();
+        
+        try
+        {
+            // Disable drag & drop for reclamations calendar (based on creation date, not planned date)
+            var options = new { editable = false, selectable = true };
+            await JSRuntime.InvokeVoidAsync("initSavoraCalendar", "savora-calendar", events, _dotNetRef, options);
+            _calendarInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Calendar init error: {ex.Message}");
+        }
+    }
+
+    private List<object> GetFilteredEvents()
+    {
+        var filtered = _reclamations.AsEnumerable();
+        
+        if (!string.IsNullOrEmpty(_selectedStatus) && Enum.TryParse<ReclamationStatus>(_selectedStatus, out var status))
+        {
+            filtered = filtered.Where(r => r.Status == status);
+        }
+        
+        if (!string.IsNullOrEmpty(_selectedPriority) && Enum.TryParse<Priority>(_selectedPriority, out var priority))
+        {
+            filtered = filtered.Where(r => r.Priority == priority);
+        }
+
+        return filtered.Select(r => new
+        {
+            id = r.Id.ToString(),
+            title = $"{GetPriorityIcon(r.Priority)} {r.Title}",
+            start = r.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss"),
+            end = r.CreatedAt.AddHours(1).ToString("yyyy-MM-ddTHH:mm:ss"),
+            backgroundColor = GetEventColor(r.Status, r.Priority),
+            borderColor = GetEventColor(r.Status, r.Priority),
+            textColor = "#ffffff",
+            className = GetEventClasses(r),
+            extendedProps = new
+            {
+                clientName = r.ClientName,
+                status = r.Status.ToString(),
+                priority = r.Priority.ToString(),
+                title = r.Title
+            }
+        }).Cast<object>().ToList();
+    }
+
+    private string GetPriorityIcon(Priority priority) => priority switch
+    {
+        Priority.High => "🔴",
+        Priority.Medium => "🟡",
+        Priority.Low => "🟢",
+        _ => ""
+    };
+
+    private string GetEventColor(ReclamationStatus status, Priority priority)
+    {
+        // Use priority for color if status is new or in progress
+        if (status == ReclamationStatus.New || status == ReclamationStatus.InProgress || status == ReclamationStatus.PendingIntervention)
+        {
+            return priority switch
+            {
+                Priority.High => "#DC2626",
+                Priority.Medium => "#F59E0B",
+                Priority.Low => "#10B981",
+                _ => "#3B82F6"
+            };
+        }
+        
+        // Use status for color otherwise
+        return status switch
+        {
+            ReclamationStatus.New => "#3B82F6",
+            ReclamationStatus.InProgress => "#F59E0B",
+            ReclamationStatus.PendingIntervention => "#F59E0B",
+            ReclamationStatus.InterventionScheduled => "#06B6D4",
+            ReclamationStatus.UnderIntervention => "#F59E0B",
+            ReclamationStatus.PendingInvoice => "#F59E0B",
+            ReclamationStatus.Closed => "#10B981",
+            ReclamationStatus.Cancelled => "#6B7280",
+            _ => "#3B82F6"
+        };
+    }
+
+    private string GetEventClasses(ReclamationListDto reclamation)
+    {
+        var classes = new List<string>();
+        
+        classes.Add($"event-{reclamation.Status.ToString().ToLower()}");
+        classes.Add($"priority-{reclamation.Priority.ToString().ToLower()}");
+        
+        return string.Join(" ", classes);
+    }
+
+    private async Task ApplyFilters()
+    {
+        if (_calendarInitialized)
+        {
+            var events = GetFilteredEvents();
+            await JSRuntime.InvokeVoidAsync("updateCalendarEvents", events);
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        _selectedStatus = "";
+        _selectedPriority = "";
+        await ApplyFilters();
+    }
+
+    private async Task RefreshCalendar()
+    {
+        _calendarInitialized = false;
+        await LoadReclamations();
+        StateHasChanged();
+        await Task.Delay(100);
+        await InitializeCalendar();
+        Snackbar.Add("Calendrier actualisé", Severity.Success);
+    }
+
+    private void CreateNewReclamation()
+    {
+        Navigation.NavigateTo("/reclamations/new");
+    }
+
+    [JSInvokable]
+    public async Task OnEventClick(string eventId)
+    {
+        if (Guid.TryParse(eventId, out var id))
+        {
+            var reclamation = _reclamations.FirstOrDefault(r => r.Id == id);
+            if (reclamation != null)
+            {
+                await ShowReclamationDialog(reclamation);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void OnDateClick(string dateStr)
+    {
+        Snackbar.Add($"Date sélectionnée: {dateStr}", Severity.Info);
+    }
+
+    [JSInvokable]
+    public void OnDateRangeSelect(string startStr, string endStr)
+    {
+        Snackbar.Add($"Période sélectionnée: {startStr} - {endStr}", Severity.Info);
+    }
+
+    private async Task ShowReclamationDialog(ReclamationListDto reclamation)
+    {
+        var parameters = new DialogParameters<ReclamationDetailDialog>
+        {
+            { x => x.Reclamation, reclamation }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            DisableBackdropClick = false
+        };
+
+        var dialog = await DialogService.ShowAsync<ReclamationDetailDialog>("", parameters, options);
+        await dialog.Result;
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        try
+        {
+            JSRuntime.InvokeVoidAsync("destroySavoraCalendar");
+        }
+        catch { }
+    }
+}
+

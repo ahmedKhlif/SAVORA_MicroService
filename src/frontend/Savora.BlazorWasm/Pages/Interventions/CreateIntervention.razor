@@ -1,0 +1,213 @@
+@page "/interventions/new"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IInterventionService InterventionService
+@inject ITechnicianService TechnicianService
+@inject IReclamationService ReclamationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Nouvelle Intervention</PageTitle>
+
+<div class="mb-3">
+    <a href="javascript:void(0)" class="btn btn-link text-muted ps-0" @onclick="GoBack">
+        <i data-feather="arrow-left" class="me-2"></i> Retour
+    </a>
+</div>
+
+<PageHeader Title="Planifier une intervention" Subtitle="Créez une nouvelle intervention pour une réclamation" Icon="tool" />
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                @if (_reclamation != null)
+                {
+                    <div class="alert alert-info mb-4">
+                        <h6 class="alert-heading mb-1">Réclamation: @_reclamation.Title</h6>
+                        <p class="mb-2">Client: @_reclamation.ClientName</p>
+                        @if (_reclamation.IsUnderWarranty)
+                        {
+                            <span class="badge bg-success">Sous garantie - Intervention gratuite</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">Hors garantie - Intervention payante</span>
+                        }
+                    </div>
+                }
+
+                <div class="mb-4">
+                    <label class="form-label">Technicien</label>
+                    <select class="form-select" @bind="_model.TechnicianId">
+                        <option value="">-- Sélectionner un technicien (optionnel) --</option>
+                        @foreach (var tech in _technicians.Where(t => t.IsAvailable))
+                        {
+                            <option value="@tech.Id">@tech.FullName (@tech.ActiveInterventions interventions actives)</option>
+                        }
+                    </select>
+                    <small class="text-muted">Vous pouvez assigner un technicien ultérieurement</small>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Date planifiée <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" @bind="_plannedDate" min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Heure</label>
+                        <input type="time" class="form-control" @bind="_plannedTime" />
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Notes (optionnel)</label>
+                    <textarea class="form-control" rows="4" @bind="_model.Notes" 
+                              placeholder="Instructions spécifiques, accès au site, etc."></textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">Annuler</button>
+                    <button type="button" class="btn btn-primary" @onclick="Submit" 
+                            disabled="@(_isSubmitting || !_plannedDate.HasValue)">
+                        @if (_isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        <i data-feather="check" class="me-1"></i> Créer l'intervention
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Techniciens disponibles</h5>
+            </div>
+            <div class="card-body">
+                @if (_technicians.Any(t => t.IsAvailable))
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var tech in _technicians.Where(t => t.IsAvailable).Take(5))
+                        {
+                            <li class="d-flex align-items-center mb-2 pb-2 border-bottom">
+                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
+                                    @tech.FullName.Substring(0, 1).ToUpper()
+                                </div>
+                                <div>
+                                    <span class="d-block fw-medium">@tech.FullName</span>
+                                    <small class="text-muted">@tech.ActiveInterventions actives</small>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted text-center mb-0">Aucun technicien disponible</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public Guid? ReclamationId { get; set; }
+    [SupplyParameterFromQuery] public bool? IsUnderWarranty { get; set; }
+
+    private CreateInterventionRequest _model = new();
+    private ReclamationDto? _reclamation;
+    private List<TechnicianDto> _technicians = new();
+    private DateTime? _plannedDate = DateTime.Today.AddDays(1);
+    private TimeOnly? _plannedTime = new TimeOnly(9, 0);
+    private bool _isSubmitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!ReclamationId.HasValue)
+        {
+            Navigation.NavigateTo("/reclamations");
+            return;
+        }
+
+        _model.ReclamationId = ReclamationId.Value;
+        
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            var recResult = await ReclamationService.GetByIdAsync(ReclamationId!.Value);
+            if (recResult.Success)
+            {
+                _reclamation = recResult.Data;
+            }
+
+            var techResult = await TechnicianService.GetAllAsync(1, 100);
+            if (techResult.Success && techResult.Data != null)
+            {
+                _technicians = techResult.Data.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void GoBack()
+    {
+        if (ReclamationId.HasValue)
+        {
+            Navigation.NavigateTo($"/reclamations/{ReclamationId}");
+        }
+        else
+        {
+            Navigation.NavigateTo("/interventions");
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (!_plannedDate.HasValue) return;
+
+        _isSubmitting = true;
+        try
+        {
+            _model.PlannedDate = _plannedDate.Value;
+            if (_plannedTime.HasValue)
+            {
+                _model.PlannedDate = _model.PlannedDate.Date.Add(_plannedTime.Value.ToTimeSpan());
+            }
+
+            var result = await InterventionService.CreateAsync(_model);
+            
+            if (result.Success && result.Data != null)
+            {
+                Snackbar.Add("Intervention créée avec succès!", Severity.Success);
+                Navigation.NavigateTo($"/interventions/{result.Data.Id}");
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la création", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

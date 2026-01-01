@@ -1,0 +1,246 @@
+@page "/parts"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IPartService PartService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Pièces détachées</PageTitle>
+
+<PageHeader Title="Pièces détachées" Subtitle="Gérez votre inventaire de pièces" Icon="settings">
+    <button type="button" class="btn btn-primary" @onclick="CreatePart">
+        <i data-feather="plus" class="me-2"></i> Nouvelle pièce
+    </button>
+</PageHeader>
+
+@if (_lowStockParts.Any())
+{
+    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+        <i data-feather="alert-triangle" class="me-2"></i>
+        <strong>@_lowStockParts.Count pièces</strong>&nbsp;en stock bas!
+    </div>
+}
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label">Rechercher</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i data-feather="search"></i></span>
+                    <input type="text" class="form-control" placeholder="Référence, nom..." 
+                           @bind="_searchTerm" @bind:event="oninput" @onkeyup="@(async () => await LoadParts())" />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" @bind="_lowStockOnly" @bind:after="LoadParts" />
+                    <label class="form-check-label">Stock bas uniquement</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Inventaire (@_parts.Count pièces)</h5>
+    </div>
+    @if (_isLoading)
+    {
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (_parts.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover my-0">
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Nom</th>
+                        <th class="d-none d-md-table-cell">Catégorie</th>
+                        <th>Prix</th>
+                        <th>Stock</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var part in _parts)
+                    {
+                        <tr>
+                            <td><code>@part.Reference</code></td>
+                            <td>
+                                <div class="fw-medium">@part.Name</div>
+                                @if (!string.IsNullOrEmpty(part.Description))
+                                {
+                                    <small class="text-muted">@part.Description</small>
+                                }
+                            </td>
+                            <td class="d-none d-md-table-cell">@(part.Category ?? "-")</td>
+                            <td><strong>@part.UnitPrice.ToString("N2")</strong> TND</td>
+                            <td>
+                                <span class="badge @(part.IsLowStock ? "bg-danger" : "bg-success")">
+                                    @part.StockQuantity
+                                </span>
+                                @if (part.IsLowStock)
+                                {
+                                    <i data-feather="alert-triangle" class="text-warning ms-1" style="width: 14px; height: 14px;"></i>
+                                }
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-success me-1" @onclick="@(() => AdjustStock(part, true))" title="Ajouter">
+                                    <i data-feather="plus"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-warning me-1" @onclick="@(() => AdjustStock(part, false))" title="Retirer">
+                                    <i data-feather="minus"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-primary me-1" @onclick="@(() => EditPart(part))" title="Modifier">
+                                    <i data-feather="edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="@(() => DeletePart(part))" title="Supprimer">
+                                    <i data-feather="trash-2"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="card-body empty-state">
+            <i data-feather="settings" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+            <h5 class="mt-3">Aucune pièce trouvée</h5>
+            <p>Ajoutez votre première pièce pour commencer.</p>
+            <button type="button" class="btn btn-primary mt-3" @onclick="CreatePart">
+                <i data-feather="plus" class="me-2"></i> Ajouter une pièce
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private List<PartDto> _parts = new();
+    private List<PartDto> _lowStockParts = new();
+    private bool _isLoading = true;
+    private string _searchTerm = "";
+    private bool _lowStockOnly = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadParts();
+        await LoadLowStock();
+    }
+
+    private async Task LoadParts()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await PartService.GetAllAsync(1, 100, _searchTerm, _lowStockOnly ? true : null);
+            if (result.Success && result.Data != null)
+            {
+                _parts = result.Data.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadLowStock()
+    {
+        try
+        {
+            var result = await PartService.GetLowStockAsync();
+            if (result.Success && result.Data != null)
+            {
+                _lowStockParts = result.Data;
+            }
+        }
+        catch { }
+    }
+
+    private async Task CreatePart()
+    {
+        var dialog = await DialogService.ShowAsync<PartDialog>("Nouvelle pièce");
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadParts();
+            await LoadLowStock();
+            Snackbar.Add("Pièce créée", Severity.Success);
+        }
+    }
+
+    private async Task EditPart(PartDto part)
+    {
+        var parameters = new DialogParameters { ["Part"] = part };
+        var dialog = await DialogService.ShowAsync<PartDialog>("Modifier pièce", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadParts();
+            Snackbar.Add("Pièce modifiée", Severity.Success);
+        }
+    }
+
+    private async Task DeletePart(PartDto part)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Supprimer la pièce",
+            $"Êtes-vous sûr de vouloir supprimer {part.Name} ?",
+            yesText: "Supprimer", cancelText: "Annuler");
+
+        if (confirm == true)
+        {
+            var result = await PartService.DeleteAsync(part.Id);
+            if (result.Success)
+            {
+                await LoadParts();
+                Snackbar.Add("Pièce supprimée", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+    }
+
+    private async Task AdjustStock(PartDto part, bool add)
+    {
+        var parameters = new DialogParameters 
+        { 
+            ["Part"] = part,
+            ["IsAdd"] = add
+        };
+        var dialog = await DialogService.ShowAsync<StockAdjustDialog>("Ajuster le stock", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadParts();
+            await LoadLowStock();
+            Snackbar.Add("Stock mis à jour", Severity.Success);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

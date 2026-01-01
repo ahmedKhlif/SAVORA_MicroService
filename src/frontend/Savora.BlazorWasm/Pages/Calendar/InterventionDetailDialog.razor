@@ -1,0 +1,144 @@
+@using MudBlazor
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true" Class="intervention-detail-dialog">
+    <TitleContent>
+        <div class="d-flex align-items-center intervention-dialog-header">
+            <div class="calendar-icon-wrapper me-3">
+                <i data-feather="calendar" style="width: 24px; height: 24px; color: white;"></i>
+            </div>
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.h6" Class="mb-0 fw-bold text-white">Détails de l'intervention</MudText>
+                <MudText Typo="Typo.body2" Class="text-white-50 mb-0">Intervention #@Intervention.Id.ToString().Substring(0, 8)</MudText>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <!-- Réclamation -->
+        <div class="mb-4">
+            <div class="d-flex align-items-center mb-2">
+                <i data-feather="alert-circle" class="me-2 text-primary" style="width: 18px; height: 18px;"></i>
+                <h6 class="text-muted mb-0 small text-uppercase fw-bold">Réclamation</h6>
+            </div>
+            <p class="mb-0 fw-semibold text-dark fs-6">@Intervention.ReclamationTitle</p>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <!-- Client -->
+            <div class="col-md-6">
+                <div class="calendar-info-card">
+                    <div class="d-flex align-items-center mb-2">
+                        <i data-feather="user" class="me-2 text-primary" style="width: 16px; height: 16px;"></i>
+                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Client</h6>
+                    </div>
+                    <p class="mb-0 fw-medium">@Intervention.ClientName</p>
+                </div>
+            </div>
+
+            <!-- Date -->
+            <div class="col-md-6">
+                <div class="calendar-info-card">
+                    <div class="d-flex align-items-center mb-2">
+                        <i data-feather="clock" class="me-2 text-primary" style="width: 16px; height: 16px;"></i>
+                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Date & Heure</h6>
+                    </div>
+                    <p class="mb-0 fw-medium">@Intervention.PlannedDate.ToString("dd/MM/yyyy")</p>
+                    <small class="text-muted">@Intervention.PlannedDate.ToString("HH:mm")</small>
+                </div>
+            </div>
+
+            <!-- Technicien -->
+            <div class="col-md-6">
+                <div class="calendar-info-card">
+                    <div class="d-flex align-items-center mb-2">
+                        <i data-feather="tool" class="me-2 text-primary" style="width: 16px; height: 16px;"></i>
+                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Technicien</h6>
+                    </div>
+                    <p class="mb-0 fw-medium">@(Intervention.TechnicianName ?? "Non assigné")</p>
+                </div>
+            </div>
+
+            <!-- Statut -->
+            <div class="col-md-6">
+                <div class="calendar-info-card">
+                    <div class="d-flex align-items-center mb-2">
+                        <i data-feather="info" class="me-2 text-primary" style="width: 16px; height: 16px;"></i>
+                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Statut</h6>
+                    </div>
+                    <MudChip Size="Size.Medium" Color="@GetStatusColor(Intervention.Status)" Variant="Variant.Filled">
+                        @GetStatusLabel(Intervention.Status)
+                    </MudChip>
+                </div>
+            </div>
+        </div>
+
+        <!-- Type -->
+        <div class="mb-3">
+            <div class="d-flex align-items-center mb-2">
+                <i data-feather="tag" class="me-2 text-primary" style="width: 18px; height: 18px;"></i>
+                <h6 class="text-muted mb-0 small text-uppercase fw-bold">Type d'intervention</h6>
+            </div>
+            @if (Intervention.IsFree)
+            {
+                <MudChip Size="Size.Medium" Color="Color.Success" Variant="Variant.Filled">
+                    🎁 Gratuite (sous garantie)
+                </MudChip>
+            }
+            else
+            {
+                <MudChip Size="Size.Medium" Color="Color.Info" Variant="Variant.Filled">
+                    💰 Payante - @Intervention.TotalAmount.ToString("N2") TND
+                </MudChip>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Color="Color.Default">
+            <i data-feather="x" class="me-1" style="width: 16px; height: 16px;"></i> Fermer
+        </MudButton>
+        <MudButton OnClick="ViewDetails" Variant="Variant.Filled" Color="Color.Primary">
+            <i data-feather="eye" class="me-1" style="width: 16px; height: 16px;"></i> Voir détails complets
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public InterventionListDto Intervention { get; set; } = null!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void ViewDetails()
+    {
+        Navigation.NavigateTo($"/interventions/{Intervention.Id}");
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private Color GetStatusColor(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => Color.Primary,
+        InterventionStatus.InProgress => Color.Warning,
+        InterventionStatus.Completed => Color.Success,
+        InterventionStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+
+    private string GetStatusLabel(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "Planifiée",
+        InterventionStatus.InProgress => "En cours",
+        InterventionStatus.Completed => "Terminée",
+        InterventionStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+}
+

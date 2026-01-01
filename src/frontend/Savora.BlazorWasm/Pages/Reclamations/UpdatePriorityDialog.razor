@@ -1,0 +1,85 @@
+@inject IReclamationService ReclamationService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudSelect T="Priority" @bind-Value="_newPriority" Label="Nouvelle priorité" Variant="Variant.Outlined" 
+                   FullWidth="true" Class="mb-4">
+            @foreach (Priority priority in Enum.GetValues(typeof(Priority)))
+            {
+                <MudSelectItem Value="@priority">@GetPriorityLabel(priority)</MudSelectItem>
+            }
+        </MudSelect>
+        
+        <MudTextField @bind-Value="_comment" Label="Commentaire (optionnel)" Variant="Variant.Outlined"
+                      Lines="3" FullWidth="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_isLoading">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Enregistrer
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Guid ReclamationId { get; set; }
+    [Parameter] public Priority CurrentPriority { get; set; }
+
+    private Priority _newPriority;
+    private string _comment = "";
+    private bool _isLoading = false;
+
+    protected override void OnInitialized()
+    {
+        _newPriority = CurrentPriority;
+    }
+
+    private async Task Submit()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await ReclamationService.UpdatePriorityAsync(ReclamationId, new UpdateReclamationPriorityRequest
+            {
+                Priority = _newPriority,
+                Comment = _comment
+            });
+
+            if (result.Success && result.Data != null)
+            {
+                // Return the updated reclamation data so the parent can update immediately
+                MudDialog.Close(DialogResult.Ok(result.Data));
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la mise à jour de la priorité", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private string GetPriorityLabel(Priority priority) => priority switch
+    {
+        Priority.Urgent => "Urgente",
+        Priority.High => "Haute",
+        Priority.Medium => "Moyenne",
+        Priority.Low => "Basse",
+        _ => priority.ToString()
+    };
+}
+

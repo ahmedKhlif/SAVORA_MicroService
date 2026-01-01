@@ -1,0 +1,1034 @@
+/* =====================================================
+   SAVORA - Custom AdminKit Theme Overrides
+   Primary: #2563EB | Accent: #06B6D4 | Font: Inter
+   ===================================================== */
+
+/* Notification unread style */
+.notification-unread {
+    background-color: rgba(37, 99, 235, 0.05) !important;
+    border-left: 3px solid #2563EB;
+}
+
+[data-theme="dark"] .notification-unread,
+.dark-mode .notification-unread {
+    background-color: rgba(37, 99, 235, 0.15) !important;
+    border-left-color: #2563EB;
+}
+
+/* Print Styles for Invoice */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .invoice-print, .invoice-print * {
+        visibility: visible;
+    }
+    .invoice-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    .no-print {
+        display: none !important;
+    }
+}
+
+/* =====================================================
+   CSS VARIABLES - Override AdminKit defaults
+   ===================================================== */
+:root {
+    --bs-primary: #2563EB;
+    --bs-primary-rgb: 37, 99, 235;
+    --bs-primary-dark: #1E40AF;
+    --savora-accent: #06B6D4;
+    --savora-accent-rgb: 6, 182, 212;
+    --bs-success: #16A34A;
+    --bs-warning: #F59E0B;
+    --bs-danger: #DC2626;
+    --bs-urgent: #BE123C;
+    --bs-body-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --bs-body-bg: #F8FAFC;
+    --bs-body-color: #1E293B;
+}
+
+/* Dark mode variables */
+[data-theme="dark"],
+.dark-mode {
+    --bs-body-bg: #0F172A;
+    --bs-body-color: #E2E8F0;
+}
+
+/* =====================================================
+   SIDEBAR CUSTOMIZATION
+   ===================================================== */
+.sidebar {
+    background: linear-gradient(135deg, #1E40AF 0%, #2563EB 100%);
+}
+
+.sidebar-brand {
+    padding: 1.25rem 1.5rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: #fff !important;
+    letter-spacing: -0.5px;
+}
+
+.sidebar-brand:hover {
+    color: #fff !important;
+}
+
+.sidebar-header {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 1rem 1.5rem 0.5rem;
+}
+
+.sidebar-item {
+    padding: 0 0.75rem;
+}
+
+.sidebar-link {
+    color: rgba(255, 255, 255, 0.85) !important;
+    border-radius: 8px;
+    margin: 2px 0;
+    transition: all 0.2s ease;
+}
+
+.sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff !important;
+}
+
+.sidebar-item.active > .sidebar-link {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff !important;
+    font-weight: 500;
+}
+
+.sidebar-link i,
+.sidebar-link svg {
+    color: rgba(255, 255, 255, 0.7);
+    margin-right: 0.75rem;
+}
+
+.sidebar-item.active .sidebar-link i,
+.sidebar-item.active .sidebar-link svg {
+    color: #fff;
+}
+
+/* Sidebar collapsed state */
+.sidebar.collapsed {
+    width: 64px;
+}
+
+.sidebar.collapsed .sidebar-link span {
+    display: none;
+}
+
+/* =====================================================
+   NAVBAR CUSTOMIZATION
+   ===================================================== */
+.navbar-bg {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.navbar .nav-icon {
+    color: #64748B;
+    transition: color 0.2s;
+}
+
+.navbar .nav-icon:hover {
+    color: #2563EB;
+}
+
+.hamburger {
+    background-color: #2563EB;
+}
+
+.hamburger:before,
+.hamburger:after {
+    background-color: #2563EB;
+}
+
+/* Notification indicator */
+.indicator {
+    background: #DC2626;
+    font-size: 0.65rem;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    padding: 0 4px;
+}
+
+/* =====================================================
+   MAIN CONTENT AREA
+   ===================================================== */
+.main {
+    background: #F8FAFC;
+    min-height: 100vh;
+}
+
+/* Dark mode override */
+[data-theme="dark"] .main,
+.dark-mode .main {
+    background: var(--bs-body-bg);
+}
+
+.content {
+    padding: 1.5rem;
+}
+
+/* =====================================================
+   CARDS - Enhanced styling
+   ===================================================== */
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+    background: transparent;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 1rem 1.25rem;
+}
+
+.card-title {
+    color: #1E293B;
+    font-weight: 600;
+    margin: 0;
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+/* KPI Cards */
+.card.kpi-card {
+    border-left: 4px solid var(--bs-primary);
+}
+
+.card.kpi-card .stat {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(37, 99, 235, 0.1);
+}
+
+.card.kpi-card .stat svg {
+    color: #2563EB;
+}
+
+/* =====================================================
+   BUTTONS - Savora styling
+   ===================================================== */
+.btn-primary {
+    background: #2563EB;
+    border-color: #2563EB;
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    background: #1E40AF;
+    border-color: #1E40AF;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: #64748B;
+    border-color: #64748B;
+    border-radius: 8px;
+}
+
+.btn-outline-primary {
+    color: #2563EB;
+    border-color: #2563EB;
+    border-radius: 8px;
+}
+
+.btn-outline-primary:hover {
+    background: #2563EB;
+    border-color: #2563EB;
+}
+
+/* Accent button */
+.btn-accent {
+    background: #06B6D4;
+    border-color: #06B6D4;
+    color: #fff;
+    border-radius: 8px;
+}
+
+.btn-accent:hover {
+    background: #0891B2;
+    border-color: #0891B2;
+    color: #fff;
+}
+
+/* =====================================================
+   BADGES - Status indicators
+   ===================================================== */
+.badge {
+    font-weight: 500;
+    padding: 0.4em 0.8em;
+    border-radius: 6px;
+}
+
+.badge.bg-primary {
+    background: #2563EB !important;
+}
+
+.badge.bg-success {
+    background: #16A34A !important;
+}
+
+.badge.bg-warning {
+    background: #F59E0B !important;
+    color: #1E293B !important;
+}
+
+.badge.bg-danger {
+    background: #DC2626 !important;
+}
+
+.badge.bg-info {
+    background: #06B6D4 !important;
+}
+
+/* Status badges */
+.badge-new { background: #3B82F6 !important; }
+.badge-in-progress { background: #F59E0B !important; color: #1E293B !important; }
+.badge-pending { background: #8B5CF6 !important; }
+.badge-completed { background: #16A34A !important; }
+.badge-closed { background: #64748B !important; }
+.badge-cancelled { background: #DC2626 !important; }
+
+/* Priority badges */
+.badge-urgent { background: #BE123C !important; }
+.badge-high { background: #DC2626 !important; }
+.badge-medium { background: #F59E0B !important; color: #1E293B !important; }
+.badge-low { background: #16A34A !important; }
+
+/* =====================================================
+   TABLES
+   ===================================================== */
+.table {
+    --bs-table-bg: transparent;
+}
+
+.table thead th {
+    background: #F8FAFC;
+    border-bottom: 2px solid #E2E8F0;
+    color: #64748B;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.875rem 1rem;
+}
+
+.table tbody td {
+    padding: 0.875rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.table-hover tbody tr:hover {
+    background: rgba(37, 99, 235, 0.04);
+}
+
+/* =====================================================
+   FORMS
+   ===================================================== */
+.form-control,
+.form-select {
+    border-radius: 8px;
+    border-color: #CBD5E1;
+    padding: 0.625rem 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.form-label {
+    font-weight: 500;
+    color: #475569;
+    margin-bottom: 0.5rem;
+}
+
+/* =====================================================
+   ALERTS
+   ===================================================== */
+.alert {
+    border-radius: 10px;
+    border: none;
+    padding: 1rem 1.25rem;
+}
+
+.alert-primary {
+    background: rgba(37, 99, 235, 0.1);
+    color: #1E40AF;
+}
+
+.alert-success {
+    background: rgba(22, 163, 74, 0.1);
+    color: #166534;
+}
+
+.alert-warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: #B45309;
+}
+
+.alert-danger {
+    background: rgba(220, 38, 38, 0.1);
+    color: #B91C1C;
+}
+
+/* =====================================================
+   DROPDOWN MENUS
+   ===================================================== */
+.dropdown-menu {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem;
+}
+
+.dropdown-item {
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+    background: rgba(37, 99, 235, 0.08);
+    color: #2563EB;
+}
+
+/* =====================================================
+   PAGINATION
+   ===================================================== */
+.page-link {
+    border-radius: 8px;
+    margin: 0 2px;
+    border: none;
+    color: #64748B;
+}
+
+.page-link:hover {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563EB;
+}
+
+.page-item.active .page-link {
+    background: #2563EB;
+    color: #fff;
+}
+
+/* =====================================================
+   PROGRESS BARS
+   ===================================================== */
+.progress {
+    border-radius: 10px;
+    background: #E2E8F0;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, #2563EB, #06B6D4);
+    border-radius: 10px;
+}
+
+/* =====================================================
+   MUDBLAZOR COMPATIBILITY
+   ===================================================== */
+/* Ensure MudBlazor components work with AdminKit */
+.mud-main-content {
+    padding: 0 !important;
+}
+
+/* MudDialog on top of Bootstrap */
+.mud-dialog-container {
+    z-index: 1060;
+}
+
+.mud-overlay {
+    z-index: 1055;
+}
+
+/* MudSnackbar positioning */
+.mud-snackbar-provider {
+    z-index: 1070;
+}
+
+/* Hide MudBlazor drawer/appbar when using AdminKit layout */
+.adminkit-layout .mud-drawer,
+.adminkit-layout .mud-appbar {
+    display: none !important;
+}
+
+/* MudTable styling to match AdminKit */
+.mud-table .mud-table-head th {
+    background: #F8FAFC;
+    color: #64748B;
+    font-weight: 600;
+}
+
+.mud-table-row:hover {
+    background: rgba(37, 99, 235, 0.04) !important;
+}
+
+/* =====================================================
+   FOOTER
+   ===================================================== */
+.footer {
+    background: transparent;
+    border-top: none;
+    padding: 0.5rem 0;
+    margin-top: auto;
+}
+
+.footer a {
+    color: #64748B;
+}
+
+.footer a:hover {
+    color: #2563EB;
+}
+
+/* =====================================================
+   ANIMATIONS & TRANSITIONS
+   ===================================================== */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Smooth transitions for sidebar */
+.sidebar,
+.main {
+    transition: all 0.3s ease;
+}
+
+/* =====================================================
+   RESPONSIVE ADJUSTMENTS
+   ===================================================== */
+@media (max-width: 991.98px) {
+    .sidebar {
+        margin-left: -260px;
+    }
+    
+    .sidebar.collapsed {
+        margin-left: 0;
+    }
+    
+    .content {
+        padding: 1rem;
+    }
+}
+
+/* =====================================================
+   SAVORA BRANDING
+   ===================================================== */
+.savora-logo {
+    font-weight: 700;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #2563EB, #06B6D4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.savora-tagline {
+    color: #64748B;
+    font-size: 0.875rem;
+}
+
+/* =====================================================
+   UTILITY CLASSES
+   ===================================================== */
+.text-primary { color: #2563EB !important; }
+.text-accent { color: #06B6D4 !important; }
+.bg-primary { background-color: #2563EB !important; }
+.bg-accent { background-color: #06B6D4 !important; }
+.border-primary { border-color: #2563EB !important; }
+.border-accent { border-color: #06B6D4 !important; }
+
+/* Gap utilities */
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 1rem; }
+.gap-4 { gap: 1.5rem; }
+
+/* Hover effects */
+.hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Dashboard Enhancements */
+.card {
+    transition: all 0.3s ease;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Chart containers */
+canvas {
+    max-height: 100%;
+}
+
+/* Loading spinner for refresh */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15em;
+}
+
+/* =====================================================
+   UNIFIED PAGE LAYOUT STYLES
+   ===================================================== */
+
+/* Page Container */
+.page-container {
+    padding: 1.5rem;
+    max-width: 100%;
+}
+
+/* Card Enhancements */
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.card-header {
+    background: #fff;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 1.25rem 1.5rem;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1E293B;
+    margin-bottom: 0;
+}
+
+/* Table Enhancements */
+.table {
+    margin-bottom: 0;
+}
+
+.table thead th {
+    background: #F8FAFC;
+    border-bottom: 2px solid #E2E8F0;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748B;
+    padding: 1rem;
+}
+
+.table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #F1F5F9;
+}
+
+.table tbody tr:hover {
+    background: #F8FAFC;
+    transition: background 0.2s ease;
+}
+
+.table-hover tbody tr:hover {
+    background: #F8FAFC;
+}
+
+/* Form Enhancements */
+.form-label {
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: #475569;
+    margin-bottom: 0.5rem;
+}
+
+.form-control,
+.form-select {
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 0.625rem 1rem;
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+}
+
+.input-group-text {
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    color: #64748B;
+}
+
+.input-group .form-control {
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+}
+
+/* Button Enhancements */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0.625rem 1.25rem;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #2563EB, #1E40AF);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #1E40AF, #1E3A8A);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-outline-primary {
+    border: 1.5px solid #2563EB;
+    color: #2563EB;
+    background: transparent;
+}
+
+.btn-outline-primary:hover {
+    background: #2563EB;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-sm {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.btn-lg {
+    padding: 0.875rem 1.75rem;
+    font-size: 1rem;
+}
+
+/* Badge Enhancements */
+.badge {
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1.5rem;
+}
+
+.empty-state i {
+    opacity: 0.3;
+    margin-bottom: 1rem;
+}
+
+.empty-state h5 {
+    color: #64748B;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #94A3B8;
+    font-size: 0.875rem;
+}
+
+/* Filter Card */
+.filter-card {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Alert Enhancements */
+.alert {
+    border-radius: 10px;
+    border: none;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.alert-danger {
+    background: #FEE2E2;
+    color: #991B1B;
+    border-left: 4px solid #DC2626;
+}
+
+.alert-warning {
+    background: #FEF3C7;
+    color: #92400E;
+    border-left: 4px solid #F59E0B;
+}
+
+.alert-success {
+    background: #D1FAE5;
+    color: #065F46;
+    border-left: 4px solid #16A34A;
+}
+
+.alert-info {
+    background: #DBEAFE;
+    color: #1E40AF;
+    border-left: 4px solid #3B82F6;
+}
+
+.alert i {
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+}
+
+/* Action Buttons Group */
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Responsive Improvements */
+@media (max-width: 768px) {
+    .page-container {
+        padding: 1rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .table {
+        font-size: 0.875rem;
+    }
+    
+    .table thead th,
+    .table tbody td {
+        padding: 0.75rem 0.5rem;
+    }
+}
+
+/* Loading States */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 12px;
+}
+
+/* Smooth Transitions */
+* {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Focus States */
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid #2563EB;
+    outline-offset: 2px;
+}
+
+/* Profile Picture Styles */
+.profile-picture-container {
+    position: relative;
+    display: inline-block;
+}
+
+.profile-picture-large {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #E2E8F0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.profile-picture-placeholder {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2563EB, #1E40AF);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border: 4px solid #E2E8F0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.profile-picture-upload-btn {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 36px;
+    height: 36px;
+    background: #2563EB;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease;
+}
+
+.profile-picture-upload-btn:hover {
+    background: #1E40AF;
+    transform: scale(1.1);
+}
+
+/* Navbar Avatar Styles */
+.avatar {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+}
+
+.avatar-placeholder {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #2563EB, #1E40AF);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Message Styles */
+.message-bubble {
+    max-width: 70%;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    word-wrap: break-word;
+}
+
+.message-sent {
+    background: linear-gradient(135deg, #2563EB, #1E40AF);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.message-received {
+    background: #F1F5F9;
+    color: #1E293B;
+    border-bottom-left-radius: 4px;
+}
+
+.message-bubble strong {
+    font-size: 0.875rem;
+}
+
+.message-bubble small {
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
+#messages-container {
+    scroll-behavior: smooth;
+}
+
+/* Print Styles */
+@media print {
+    .no-print,
+    .btn,
+    .sidebar,
+    .navbar {
+        display: none !important;
+    }
+    
+    .card {
+        box-shadow: none;
+        border: 1px solid #E2E8F0;
+    }
+}
+

@@ -1,0 +1,476 @@
+@inherits LayoutComponentBase
+@inject IAuthService AuthService
+@inject INotificationService NotificationService
+@inject IMessageService MessageService
+@inject IThemeService ThemeService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+@implements IDisposable
+
+<AuthorizeView>
+    <Authorized>
+        <!-- AdminKit Wrapper -->
+        <div class="wrapper">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="sidebar js-sidebar @(_sidebarCollapsed ? "collapsed" : "")">
+                <div class="sidebar-content js-simplebar">
+                    <!-- Brand -->
+                    <a class="sidebar-brand d-flex align-items-center" href="/">
+                        <img src="img/logo.png" alt="SAVORA" height="32" class="me-2" />
+                        <span class="align-middle">SAVORA</span>
+                    </a>
+
+                    <!-- Navigation -->
+                    <ul class="sidebar-nav">
+                        @if (context.User.IsInRole("Client"))
+                        {
+                            <!-- Client Menu -->
+                            <li class="sidebar-header">Menu Principal</li>
+                            
+                            <li class="sidebar-item @IsActive("/")">
+                                <a class="sidebar-link" href="/">
+                                    <i class="align-middle" data-feather="home"></i>
+                                    <span class="align-middle">Tableau de bord</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/my-reclamations")">
+                                <a class="sidebar-link" href="/my-reclamations">
+                                    <i class="align-middle" data-feather="alert-circle"></i>
+                                    <span class="align-middle">Mes Réclamations</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/my-articles")">
+                                <a class="sidebar-link" href="/my-articles">
+                                    <i class="align-middle" data-feather="package"></i>
+                                    <span class="align-middle">Mes Articles</span>
+                                </a>
+                            </li>
+                            
+                            
+                            <li class="sidebar-header">Informations</li>
+                            
+                            <li class="sidebar-item @IsActive("/my-invoices")">
+                                <a class="sidebar-link" href="/my-invoices">
+                                    <i class="align-middle" data-feather="file-text"></i>
+                                    <span class="align-middle">Mes Factures</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/messages")">
+                                <a class="sidebar-link" href="/messages">
+                                    <i class="align-middle" data-feather="mail"></i>
+                                    <span class="align-middle">Messages</span>
+                                    @if (_unreadMessageCount > 0)
+                                    {
+                                        <span class="badge bg-primary rounded-pill ms-auto">@_unreadMessageCount</span>
+                                    }
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/notifications")">
+                                <a class="sidebar-link" href="/notifications">
+                                    <i class="align-middle" data-feather="bell"></i>
+                                    <span class="align-middle">Notifications</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/profile")">
+                                <a class="sidebar-link" href="/profile">
+                                    <i class="align-middle" data-feather="user"></i>
+                                    <span class="align-middle">Mon Profil</span>
+                                </a>
+                            </li>
+                        }
+
+                        @if (context.User.IsInRole("ResponsableSAV"))
+                        {
+                            <!-- Responsable SAV Menu -->
+                            <li class="sidebar-header">Gestion SAV</li>
+                            
+                            <li class="sidebar-item @IsActive("/")">
+                                <a class="sidebar-link" href="/">
+                                    <i class="align-middle" data-feather="sliders"></i>
+                                    <span class="align-middle">Dashboard</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/reclamations")">
+                                <a class="sidebar-link" href="/reclamations">
+                                    <i class="align-middle" data-feather="alert-circle"></i>
+                                    <span class="align-middle">Réclamations</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/interventions")">
+                                <a class="sidebar-link" href="/interventions">
+                                    <i class="align-middle" data-feather="tool"></i>
+                                    <span class="align-middle">Interventions</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/calendar")">
+                                <a class="sidebar-link" href="/calendar">
+                                    <i class="align-middle" data-feather="calendar"></i>
+                                    <span class="align-middle">Calendrier Interventions</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/reclamations-calendar")">
+                                <a class="sidebar-link" href="/reclamations-calendar">
+                                    <i class="align-middle" data-feather="alert-circle"></i>
+                                    <span class="align-middle">Calendrier Réclamations</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/technicians")">
+                                <a class="sidebar-link" href="/technicians">
+                                    <i class="align-middle" data-feather="users"></i>
+                                    <span class="align-middle">Techniciens</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-header">Articles & Pièces</li>
+                            
+                            <li class="sidebar-item @IsActive("/articles")">
+                                <a class="sidebar-link" href="/articles">
+                                    <i class="align-middle" data-feather="package"></i>
+                                    <span class="align-middle">Articles</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/parts")">
+                                <a class="sidebar-link" href="/parts">
+                                    <i class="align-middle" data-feather="settings"></i>
+                                    <span class="align-middle">Pièces détachées</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-header">Administration</li>
+                            
+                            <li class="sidebar-item @IsActive("/users")">
+                                <a class="sidebar-link" href="/users">
+                                    <i class="align-middle" data-feather="users"></i>
+                                    <span class="align-middle">Utilisateurs</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/clients")">
+                                <a class="sidebar-link" href="/clients">
+                                    <i class="align-middle" data-feather="user-check"></i>
+                                    <span class="align-middle">Clients</span>
+                                </a>
+                            </li>
+                            
+                            
+                            <li class="sidebar-item @IsActive("/invoices")">
+                                <a class="sidebar-link" href="/invoices">
+                                    <i class="align-middle" data-feather="file-text"></i>
+                                    <span class="align-middle">Factures</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-header">Communication</li>
+                            
+                            <li class="sidebar-item @IsActive("/messages")">
+                                <a class="sidebar-link" href="/messages">
+                                    <i class="align-middle" data-feather="mail"></i>
+                                    <span class="align-middle">Messages</span>
+                                    @if (_unreadMessageCount > 0)
+                                    {
+                                        <span class="badge bg-primary rounded-pill ms-auto">@_unreadMessageCount</span>
+                                    }
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/notifications")">
+                                <a class="sidebar-link" href="/notifications">
+                                    <i class="align-middle" data-feather="bell"></i>
+                                    <span class="align-middle">Notifications</span>
+                                </a>
+                            </li>
+                            
+                            <li class="sidebar-item @IsActive("/profile")">
+                                <a class="sidebar-link" href="/profile">
+                                    <i class="align-middle" data-feather="user"></i>
+                                    <span class="align-middle">Mon Profil</span>
+                                </a>
+                            </li>
+                        }
+                    </ul>
+
+                    <!-- Sidebar Footer -->
+                    <div class="sidebar-cta">
+                        <div class="sidebar-cta-content">
+                            <strong class="d-inline-block mb-2 text-white">SAVORA</strong>
+                            <div class="mb-2 text-sm text-white-50">
+                                Smart After-Sales Service, Simplified.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <div class="main">
+                <!-- Top Navbar -->
+                <nav class="navbar navbar-expand navbar-light navbar-bg">
+                    <a class="sidebar-toggle js-sidebar-toggle" @onclick="ToggleSidebar" @onclick:preventDefault>
+                        <i class="hamburger align-self-center"></i>
+                    </a>
+
+                    <div class="navbar-collapse collapse">
+                        <ul class="navbar-nav navbar-align">
+                            <!-- Messages Dropdown -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-icon dropdown-toggle" href="#" id="messagesDropdown" data-bs-toggle="dropdown">
+                                    <div class="position-relative">
+                                        <i class="align-middle" data-feather="mail"></i>
+                                        @if (_unreadMessageCount > 0)
+                                        {
+                                            <span class="indicator">@_unreadMessageCount</span>
+                                        }
+                                    </div>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end py-0" aria-labelledby="messagesDropdown">
+                                    <div class="dropdown-menu-header">
+                                        @_unreadMessageCount Message(s) non lu(s)
+                                    </div>
+                                    <div class="dropdown-menu-footer">
+                                        <a href="/messages" class="text-muted">Voir tous les messages</a>
+                                    </div>
+                                </div>
+                            </li>
+
+                            <!-- Notifications Dropdown -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-icon dropdown-toggle" href="#" id="alertsDropdown" data-bs-toggle="dropdown">
+                                    <div class="position-relative">
+                                        <i class="align-middle" data-feather="bell"></i>
+                                        @if (_notificationCount > 0)
+                                        {
+                                            <span class="indicator">@_notificationCount</span>
+                                        }
+                                    </div>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end py-0" aria-labelledby="alertsDropdown">
+                                    <div class="dropdown-menu-header">
+                                        @_notificationCount Nouvelle(s) Notification(s)
+                                    </div>
+                                    <div class="dropdown-menu-footer">
+                                        <a href="/notifications" class="text-muted">Voir toutes les notifications</a>
+                                    </div>
+                                </div>
+                            </li>
+
+                            <!-- Theme Toggle -->
+                            <li class="nav-item">
+                                <a class="nav-icon" href="#" @onclick="ToggleTheme" @onclick:preventDefault title="@(_isDarkMode ? "Mode clair" : "Mode sombre")">
+                                    <i class="align-middle" data-feather="@(_isDarkMode ? "sun" : "moon")"></i>
+                                </a>
+                            </li>
+
+                            <!-- User Menu -->
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle d-none d-sm-inline-block" href="#" data-bs-toggle="dropdown">
+                                    @if (!string.IsNullOrEmpty(_userProfilePicture))
+                                    {
+                                        <img src="@_userProfilePicture" class="avatar img-fluid rounded me-1" alt="@_userName" />
+                                    }
+                                    else
+                                    {
+                                        <div class="avatar avatar-placeholder rounded me-1 d-inline-flex align-items-center justify-content-center">
+                                            <i data-feather="user" style="width: 20px; height: 20px;"></i>
+                                        </div>
+                                    }
+                                    <span class="text-dark">@_userName</span>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <a class="dropdown-item" href="/profile">
+                                        <i class="align-middle me-1" data-feather="user"></i> Mon Profil
+                                    </a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="#" @onclick="Logout" @onclick:preventDefault>
+                                        <i class="align-middle me-1" data-feather="log-out"></i> Déconnexion
+                                    </a>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+
+                <!-- Main Content Area -->
+                <main class="content">
+                    <div class="container-fluid p-0">
+                        @Body
+                    </div>
+                </main>
+
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <!-- Non-authenticated layout (Login/Register pages) -->
+        <div class="main d-flex justify-content-center w-100">
+            <main class="content d-flex p-0">
+                <div class="container d-flex flex-column">
+                    @Body
+                </div>
+            </main>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private bool _sidebarCollapsed = false;
+    private string _userName = "Utilisateur";
+    private string _userRole = "";
+    private string? _userProfilePicture = null;
+    private int _notificationCount = 0;
+    private int _unreadMessageCount = 0;
+    private bool _isDarkMode = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        // Initialize theme
+        await ThemeService.InitializeThemeAsync();
+        _isDarkMode = await ThemeService.IsDarkModeAsync();
+        // Don't load user info immediately - wait for authentication state to be determined
+        // LoadUserInfo will be called when needed
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialize Feather icons after first render
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+            // Load user info after first render when authentication state is ready
+            await LoadUserInfo();
+        }
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Re-initialize Feather icons on navigation
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+        catch { }
+        
+        // Reload user info when navigating to profile or messages page
+        if (e.Location.Contains("/profile") || e.Location.Contains("/messages"))
+        {
+            await LoadUserInfo();
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task LoadUserInfo()
+    {
+        try
+        {
+            // Check if user is authenticated before making API call
+            var isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            if (!isAuthenticated)
+            {
+                return; // Don't call API if not authenticated
+            }
+
+            var userResult = await AuthService.GetCurrentUserAsync();
+            if (userResult.Success && userResult.Data != null)
+            {
+                _userName = userResult.Data.FullName ?? userResult.Data.Email ?? "Utilisateur";
+                _userRole = userResult.Data.Role ?? "";
+                _userProfilePicture = GetImageUrl(userResult.Data.ProfilePictureUrl);
+                
+                // Load notification count only if user is authenticated
+                var notifResult = await NotificationService.GetUnreadCountAsync();
+                if (notifResult.Success)
+                {
+                    _notificationCount = notifResult.Data;
+                }
+                
+                // Load unread message count
+                var messageResult = await MessageService.GetUnreadCountAsync();
+                if (messageResult.Success)
+                {
+                    _unreadMessageCount = messageResult.Data;
+                }
+                
+                StateHasChanged();
+            }
+        }
+        catch 
+        { 
+            // User not authenticated or API error - this is normal for unauthenticated users
+        }
+    }
+
+    private void ToggleSidebar()
+    {
+        _sidebarCollapsed = !_sidebarCollapsed;
+    }
+
+    private string IsActive(string href)
+    {
+        var relativePath = Navigation.ToBaseRelativePath(Navigation.Uri);
+        
+        if (string.IsNullOrEmpty(relativePath) && href == "/")
+            return "active";
+        
+        if (href != "/" && ("/" + relativePath).StartsWith(href))
+            return "active";
+        
+        return "";
+    }
+
+    private string GetImageUrl(string? relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return string.Empty;
+
+        // If already a full URL, return as is
+        if (relativePath.StartsWith("http://") || relativePath.StartsWith("https://"))
+            return relativePath;
+
+        // Use API Gateway if enabled, otherwise use AuthService directly
+        var useGateway = Configuration.GetValue<bool>("ApiSettings:UseGateway", false);
+        if (useGateway)
+        {
+            var gatewayUrl = Configuration["ApiSettings:GatewayUrl"] ?? "http://localhost:5010";
+            return $"{gatewayUrl}{relativePath}";
+        }
+        else
+        {
+            var authServiceUrl = Configuration["ApiSettings:AuthServiceUrl"] ?? "http://localhost:5001";
+            return $"{authServiceUrl}{relativePath}";
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        await ThemeService.ToggleThemeAsync();
+        _isDarkMode = await ThemeService.IsDarkModeAsync();
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        StateHasChanged();
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Snackbar.Add("Déconnexion réussie", Severity.Success);
+        Navigation.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

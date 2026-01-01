@@ -1,0 +1,52 @@
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Changer le rôle</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>Changer le rôle de <strong>@UserName</strong></MudText>
+        <MudSelect @bind-Value="_selectedRole" Label="Nouveau rôle" Variant="Variant.Outlined" Margin="Margin.Normal">
+            <MudSelectItem Value="@("Client")">Client</MudSelectItem>
+            <MudSelectItem Value="@("ResponsableSAV")">Responsable SAV</MudSelectItem>
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ChangeRole" Disabled="@(_selectedRole == CurrentRole)">Changer</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Guid UserId { get; set; }
+    [Parameter] public string CurrentRole { get; set; } = string.Empty;
+    [Parameter] public string UserName { get; set; } = string.Empty;
+    
+    [Inject] private IAuthService AuthService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    
+    private string _selectedRole = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _selectedRole = CurrentRole;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task ChangeRole()
+    {
+        var result = await AuthService.ChangeUserRoleAsync(UserId, _selectedRole);
+        if (result.Success)
+        {
+            Snackbar.Add($"Rôle de {UserName} changé avec succès", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add(result.Message ?? "Erreur lors du changement de rôle", Severity.Error);
+        }
+    }
+}
+

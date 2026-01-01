@@ -1,0 +1,209 @@
+@inject IPartService PartService
+@inject IArticleService ArticleService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_model.Reference" Label="Référence" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" 
+                      HelperText="@_suggestedReference" />
+        
+        <MudTextField @bind-Value="_model.Name" Label="Nom" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" />
+        
+        <MudTextField @bind-Value="_model.Description" Label="Description" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Lines="2" />
+        
+        <MudAutocomplete T="string" @bind-Value="_model.Category" Label="Catégorie" Variant="Variant.Outlined"
+                        FullWidth="true" Class="mb-3" 
+                        SearchFunc="@SearchCategories"
+                        ToStringFunc="@(cat => cat ?? string.Empty)"
+                        MaxItems="10" />
+        
+        <MudNumericField @bind-Value="_model.UnitPrice" Label="Prix unitaire (TND)" Variant="Variant.Outlined"
+                         FullWidth="true" Class="mb-3" Min="0.01m" Format="N2" />
+        
+        <MudNumericField @bind-Value="_model.StockQuantity" Label="Quantité en stock" Variant="Variant.Outlined"
+                         FullWidth="true" Class="mb-3" Min="0" />
+        
+        <MudNumericField @bind-Value="_model.MinStockLevel" Label="Seuil d'alerte stock" Variant="Variant.Outlined"
+                         FullWidth="true" Class="mb-3" Min="0" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_isLoading">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Enregistrer
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public PartDto? Part { get; set; }
+
+    private CreatePartRequest _model = new() { UnitPrice = 0.01m, MinStockLevel = 5 };
+    private bool _isLoading = false;
+    private bool _isEdit => Part != null;
+    private string? _suggestedReference;
+    private List<string> _availableCategories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Part != null)
+        {
+            _model.Reference = Part.Reference;
+            _model.Name = Part.Name;
+            _model.Description = Part.Description;
+            _model.Category = Part.Category;
+            _model.UnitPrice = Part.UnitPrice;
+            _model.StockQuantity = Part.StockQuantity;
+            _model.MinStockLevel = Part.MinStockLevel;
+        }
+        else
+        {
+            // Load suggestions for new part
+            await LoadSuggestedReference();
+            await LoadCategories();
+        }
+    }
+
+    private async Task LoadSuggestedReference()
+    {
+        try
+        {
+            var result = await PartService.GetAllAsync(1, 1, null, null);
+            if (result.Success && result.Data != null && result.Data.Items.Any())
+            {
+                var lastPart = result.Data.Items.OrderByDescending(p => p.Reference).First();
+                var suggestedRef = GenerateNextReference(lastPart.Reference);
+                _suggestedReference = $"Suggestion: {suggestedRef}";
+                _model.Reference = suggestedRef;
+            }
+            else
+            {
+                _suggestedReference = "Suggestion: PART-001";
+                _model.Reference = "PART-001";
+            }
+        }
+        catch
+        {
+            _suggestedReference = "Suggestion: PART-001";
+            _model.Reference = "PART-001";
+        }
+    }
+
+    private string GenerateNextReference(string lastReference)
+    {
+        if (string.IsNullOrEmpty(lastReference))
+            return "PART-001";
+
+        // Extract number from reference (e.g., "PART-001" -> 1, "PART-123" -> 123)
+        var match = System.Text.RegularExpressions.Regex.Match(lastReference, @"(\d+)$");
+        if (match.Success && int.TryParse(match.Value, out var number))
+        {
+            var prefix = lastReference.Substring(0, lastReference.Length - match.Value.Length);
+            var nextNumber = number + 1;
+            return $"{prefix}{nextNumber:D3}";
+        }
+
+        // If no number found, try to extract and increment
+        var parts = lastReference.Split('-');
+        if (parts.Length > 1 && int.TryParse(parts.Last(), out var num))
+        {
+            var prefix = string.Join("-", parts.Take(parts.Length - 1));
+            return $"{prefix}-{(num + 1):D3}";
+        }
+
+        return "PART-001";
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            var result = await ArticleService.GetAllAsync(1, 1000, null, null);
+            if (result.Success && result.Data != null)
+            {
+                _availableCategories = result.Data.Items
+                    .Where(a => !string.IsNullOrEmpty(a.Category))
+                    .Select(a => a.Category!)
+                    .Distinct()
+                    .OrderBy(c => c)
+                    .ToList();
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+    }
+
+    private Task<IEnumerable<string>> SearchCategories(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult<IEnumerable<string>>(_availableCategories);
+
+        var filtered = _availableCategories
+            .Where(c => c.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return Task.FromResult<IEnumerable<string>>(filtered);
+    }
+
+    private async Task Submit()
+    {
+        _isLoading = true;
+        try
+        {
+            if (_isEdit)
+            {
+                var updateRequest = new UpdatePartRequest
+                {
+                    Reference = _model.Reference,
+                    Name = _model.Name,
+                    Description = _model.Description,
+                    Category = _model.Category,
+                    UnitPrice = _model.UnitPrice,
+                    StockQuantity = _model.StockQuantity,
+                    MinStockLevel = _model.MinStockLevel
+                };
+                var result = await PartService.UpdateAsync(Part!.Id, updateRequest);
+                if (result.Success)
+                {
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result.Message ?? "Erreur lors de la modification de la pièce", Severity.Error);
+                }
+            }
+            else
+            {
+                var result = await PartService.CreateAsync(_model);
+                if (result.Success)
+                {
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result.Message ?? "Erreur lors de la création de la pièce", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

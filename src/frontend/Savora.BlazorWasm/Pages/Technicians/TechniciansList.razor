@@ -1,0 +1,191 @@
+@page "/technicians"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject ITechnicianService TechnicianService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Techniciens</PageTitle>
+
+<PageHeader Title="Techniciens" Subtitle="Gérez votre équipe technique" Icon="users">
+    <button type="button" class="btn btn-primary" @onclick="CreateTechnician">
+        <i data-feather="plus" class="me-2"></i> Nouveau technicien
+    </button>
+</PageHeader>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Liste des techniciens (@_technicians.Count)</h5>
+    </div>
+    @if (_isLoading)
+    {
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (_technicians.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover my-0">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th class="d-none d-md-table-cell">Email</th>
+                        <th class="d-none d-lg-table-cell">Téléphone</th>
+                        <th>Compétences</th>
+                        <th>Disponibilité</th>
+                        <th class="d-none d-md-table-cell">Interventions</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var tech in _technicians)
+                    {
+                        <tr>
+                            <td class="fw-medium">@tech.FullName</td>
+                            <td class="d-none d-md-table-cell">@tech.Email</td>
+                            <td class="d-none d-lg-table-cell">@tech.Phone</td>
+                            <td>
+                                @foreach (var skill in tech.Skills.Take(2))
+                                {
+                                    <span class="badge bg-light text-dark me-1">@skill</span>
+                                }
+                                @if (tech.Skills.Count > 2)
+                                {
+                                    <span class="badge bg-secondary">+@(tech.Skills.Count - 2)</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" checked="@tech.IsAvailable"
+                                           @onchange="@(async (e) => await ToggleAvailability(tech, (bool)(e.Value ?? false)))" />
+                                </div>
+                            </td>
+                            <td class="d-none d-md-table-cell">
+                                <span class="text-muted">@tech.ActiveInterventions actives / @tech.CompletedInterventions terminées</span>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary me-1" @onclick="@(() => EditTechnician(tech))" title="Modifier">
+                                    <i data-feather="edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="@(() => DeleteTechnician(tech))" title="Supprimer">
+                                    <i data-feather="trash-2"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="card-body empty-state">
+            <i data-feather="users" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+            <h5 class="mt-3">Aucun technicien</h5>
+            <p>Ajoutez votre premier technicien pour commencer.</p>
+            <button type="button" class="btn btn-primary mt-3" @onclick="CreateTechnician">
+                <i data-feather="plus" class="me-2"></i> Ajouter un technicien
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private List<TechnicianDto> _technicians = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTechnicians();
+    }
+
+    private async Task LoadTechnicians()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await TechnicianService.GetAllAsync(1, 100);
+            if (result.Success && result.Data != null)
+            {
+                _technicians = result.Data.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateTechnician()
+    {
+        var dialog = await DialogService.ShowAsync<TechnicianDialog>("Nouveau technicien");
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadTechnicians();
+            Snackbar.Add("Technicien créé", Severity.Success);
+        }
+    }
+
+    private async Task EditTechnician(TechnicianDto technician)
+    {
+        var parameters = new DialogParameters { ["Technician"] = technician };
+        var dialog = await DialogService.ShowAsync<TechnicianDialog>("Modifier technicien", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadTechnicians();
+            Snackbar.Add("Technicien modifié", Severity.Success);
+        }
+    }
+
+    private async Task DeleteTechnician(TechnicianDto technician)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Supprimer le technicien",
+            $"Êtes-vous sûr de vouloir supprimer {technician.FullName} ?",
+            yesText: "Supprimer", cancelText: "Annuler");
+
+        if (confirm == true)
+        {
+            var result = await TechnicianService.DeleteAsync(technician.Id);
+            if (result.Success)
+            {
+                await LoadTechnicians();
+                Snackbar.Add("Technicien supprimé", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+    }
+
+    private async Task ToggleAvailability(TechnicianDto technician, bool isAvailable)
+    {
+        var result = await TechnicianService.SetAvailabilityAsync(technician.Id, isAvailable);
+        if (result.Success)
+        {
+            technician.IsAvailable = isAvailable;
+            Snackbar.Add($"Disponibilité mise à jour", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(result.Message, Severity.Error);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

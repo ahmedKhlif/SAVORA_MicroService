@@ -1,0 +1,73 @@
+@inject INotificationService NotificationService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<MudBadge Content="@_unreadCount" Color="Color.Error" Overlap="true" Visible="@(_unreadCount > 0)">
+    <MudIconButton Icon="@Icons.Material.Filled.Notifications" 
+                   Color="Color.Default"
+                   OnClick="@GoToNotifications" />
+</MudBadge>
+
+@code {
+    private int _unreadCount = 0;
+    private System.Threading.Timer? _refreshTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUnreadCount();
+        
+        // Refresh count every 30 seconds
+        _refreshTimer = new System.Threading.Timer(async _ => 
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadUnreadCount();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Also refresh when navigating back to the page
+            Navigation.LocationChanged += OnLocationChanged;
+        }
+        return Task.CompletedTask;
+    }
+
+    private async void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        await LoadUnreadCount();
+        StateHasChanged();
+    }
+
+    private async Task LoadUnreadCount()
+    {
+        try
+        {
+            var result = await NotificationService.GetUnreadCountAsync();
+            if (result.Success)
+            {
+                _unreadCount = result.Data;
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+    }
+
+    private void GoToNotifications()
+    {
+        Navigation.NavigateTo("/notifications");
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}
+

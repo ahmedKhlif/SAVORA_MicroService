@@ -1,0 +1,108 @@
+@inject IInterventionService InterventionService
+@inject ITechnicianService TechnicianService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_isLoadingTechnicians)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <MudSelect T="Guid?" @bind-Value="_selectedTechnicianId" Label="Technicien" Variant="Variant.Outlined"
+                       FullWidth="true" Required="true">
+                @foreach (var tech in _technicians.Where(t => t.IsAvailable))
+                {
+                    <MudSelectItem Value="@((Guid?)tech.Id)">
+                        <div class="d-flex justify-space-between w-100">
+                            <span>@tech.FullName</span>
+                            <MudChip Size="Size.Small">@tech.ActiveInterventions actives</MudChip>
+                        </div>
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (!_technicians.Any(t => t.IsAvailable))
+            {
+                <MudAlert Severity="Severity.Warning" Class="mt-2">
+                    Aucun technicien disponible
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" 
+                   Disabled="@(_isLoading || !_selectedTechnicianId.HasValue)">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Assigner
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Guid InterventionId { get; set; }
+
+    private List<TechnicianDto> _technicians = new();
+    private Guid? _selectedTechnicianId;
+    private bool _isLoadingTechnicians = true;
+    private bool _isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTechnicians();
+    }
+
+    private async Task LoadTechnicians()
+    {
+        _isLoadingTechnicians = true;
+        try
+        {
+            var result = await TechnicianService.GetAllAsync(1, 100);
+            if (result.Success && result.Data != null)
+            {
+                _technicians = result.Data.Items;
+            }
+        }
+        finally
+        {
+            _isLoadingTechnicians = false;
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (!_selectedTechnicianId.HasValue) return;
+
+        _isLoading = true;
+        try
+        {
+            var result = await InterventionService.AssignTechnicianAsync(InterventionId, _selectedTechnicianId.Value);
+            if (result.Success && result.Data != null)
+            {
+                // Return the updated intervention data so the parent can update immediately
+                MudDialog.Close(DialogResult.Ok(result.Data));
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de l'assignation du technicien", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

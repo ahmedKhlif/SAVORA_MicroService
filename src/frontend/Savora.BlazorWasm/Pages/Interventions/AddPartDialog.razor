@@ -1,0 +1,119 @@
+@inject IInterventionService InterventionService
+@inject IPartService PartService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_isLoadingParts)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+            <MudSelect T="Guid?" @bind-Value="_selectedPartId" Label="Pièce" Variant="Variant.Outlined"
+                       FullWidth="true" Required="true" Class="mb-3">
+                @foreach (var part in _parts.Where(p => p.StockQuantity > 0))
+                {
+                    <MudSelectItem Value="@((Guid?)part.Id)">
+                        <div class="d-flex justify-space-between w-100">
+                            <span>@part.Name (@part.Reference)</span>
+                            <span>@part.UnitPrice.ToString("N2") TND - Stock: @part.StockQuantity</span>
+                        </div>
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudNumericField @bind-Value="_quantity" Label="Quantité" Variant="Variant.Outlined"
+                             FullWidth="true" Min="1" Max="@_maxQuantity" />
+
+            @if (_selectedPart != null)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                    Total: @((_quantity * _selectedPart.UnitPrice).ToString("N2")) TND
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" 
+                   Disabled="@(_isLoading || !_selectedPartId.HasValue || _quantity < 1)">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Ajouter
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Guid InterventionId { get; set; }
+
+    private List<PartDto> _parts = new();
+    private Guid? _selectedPartId;
+    private int _quantity = 1;
+    private bool _isLoadingParts = true;
+    private bool _isLoading = false;
+    private PartDto? _selectedPart => _parts.FirstOrDefault(p => p.Id == _selectedPartId);
+    private int _maxQuantity => _selectedPart?.StockQuantity ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadParts();
+    }
+
+    private async Task LoadParts()
+    {
+        _isLoadingParts = true;
+        try
+        {
+            var result = await PartService.GetAllAsync(1, 200);
+            if (result.Success && result.Data != null)
+            {
+                _parts = result.Data.Items;
+            }
+        }
+        finally
+        {
+            _isLoadingParts = false;
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (!_selectedPartId.HasValue || _quantity < 1) return;
+
+        _isLoading = true;
+        try
+        {
+            var result = await InterventionService.AddPartAsync(InterventionId, new AddPartRequest
+            {
+                PartId = _selectedPartId.Value,
+                Quantity = _quantity
+            });
+            
+            if (result.Success && result.Data != null)
+            {
+                // Return the updated intervention data so the parent can update immediately
+                MudDialog.Close(DialogResult.Ok(result.Data));
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de l'ajout de la pièce", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

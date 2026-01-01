@@ -1,0 +1,315 @@
+@page "/reclamations"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IReclamationService ReclamationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Réclamations</PageTitle>
+
+<PageHeader Title="Réclamations" Subtitle="Gérez toutes les réclamations clients" Icon="alert-circle">
+    <button type="button" class="btn btn-primary" @onclick="@(() => Navigation.NavigateTo("/reclamations/new"))">
+        <i data-feather="plus" class="me-2"></i> Nouvelle réclamation
+    </button>
+</PageHeader>
+
+<!-- Filters Card -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Rechercher</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i data-feather="search"></i></span>
+                    <input type="text" class="form-control" placeholder="Titre, client..." 
+                           @bind="_searchTerm" @bind:event="oninput" @onkeyup="@(async () => await LoadReclamations())" />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Statut</label>
+                <select class="form-select" @bind="_statusFilterValue" @bind:after="FilterChanged">
+                    <option value="">Tous les statuts</option>
+                    @foreach (ReclamationStatus status in Enum.GetValues(typeof(ReclamationStatus)))
+                    {
+                        <option value="@status">@GetStatusLabel(status)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Priorité</label>
+                <select class="form-select" @bind="_priorityFilterValue" @bind:after="FilterChanged">
+                    <option value="">Toutes les priorités</option>
+                    @foreach (Priority priority in Enum.GetValues(typeof(Priority)))
+                    {
+                        <option value="@priority">@GetPriorityLabel(priority)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                    <i data-feather="x" class="me-1"></i> Effacer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table Card -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Liste des réclamations (@_reclamations.Count)</h5>
+    </div>
+    @if (_isLoading)
+    {
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (_reclamations.Any())
+    {
+        <table class="table table-hover my-0">
+            <thead>
+                <tr>
+                    <th>Client</th>
+                    <th>Titre</th>
+                    <th>Priorité</th>
+                    <th>Statut</th>
+                    <th>SLA</th>
+                    <th class="d-none d-md-table-cell">Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in _reclamations)
+                {
+                    <tr>
+                        <td>@item.ClientName</td>
+                        <td>
+                            <a href="/reclamations/@item.Id" class="text-primary fw-medium">@item.Title</a>
+                        </td>
+                        <td>
+                            <span class="badge @GetPriorityBadgeClass(item.Priority)">@GetPriorityLabel(item.Priority)</span>
+                        </td>
+                        <td>
+                            <span class="badge @GetStatusBadgeClass(item.Status)">@GetStatusLabel(item.Status)</span>
+                        </td>
+                        <td>
+                            <span class="badge @GetSlaBadgeClass(item.SlaStatus)">@GetSlaLabel(item.SlaStatus)</span>
+                        </td>
+                        <td class="d-none d-md-table-cell">@item.CreatedAt.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <a href="/reclamations/@item.Id" class="btn btn-sm btn-outline-primary me-1" title="Voir">
+                                <i data-feather="eye"></i>
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Modifier statut" @onclick="@(() => EditStatus(item))">
+                                <i data-feather="edit"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="card-body empty-state">
+            <i data-feather="inbox" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+            <h5 class="mt-3">Aucune réclamation trouvée</h5>
+            <p>Modifiez vos filtres pour voir plus de résultats.</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ReclamationListDto> _reclamations = new();
+    private bool _isLoading = true;
+    private string _searchTerm = "";
+    private string _statusFilterValue = "";
+    private string _priorityFilterValue = "";
+    private ReclamationStatus? _statusFilter => string.IsNullOrEmpty(_statusFilterValue) ? null : Enum.Parse<ReclamationStatus>(_statusFilterValue);
+    private Priority? _priorityFilter => string.IsNullOrEmpty(_priorityFilterValue) ? null : Enum.Parse<Priority>(_priorityFilterValue);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReclamations();
+    }
+
+    private async Task LoadReclamations()
+    {
+        _isLoading = true;
+        
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("console.log", "[ReclamationsList] Loading reclamations...", new { 
+                searchTerm = _searchTerm, 
+                statusFilter = _statusFilter?.ToString(), 
+                priorityFilter = _priorityFilter?.ToString() 
+            });
+
+            var result = await ReclamationService.GetAllAsync(1, 100, _searchTerm, _statusFilter, _priorityFilter);
+            
+            await JSRuntime.InvokeVoidAsync("console.log", "[ReclamationsList] API Response:", new { 
+                success = result.Success, 
+                message = result.Message,
+                hasData = result.Data != null,
+                itemCount = result.Data?.Items?.Count ?? 0
+            });
+
+            if (result.Success && result.Data != null)
+            {
+                _reclamations = result.Data.Items;
+                await JSRuntime.InvokeVoidAsync("console.log", $"[ReclamationsList] ✅ Loaded {_reclamations.Count} reclamations");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", "[ReclamationsList] ❌ API Error:", new { 
+                    success = result.Success, 
+                    message = result.Message 
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", "[ReclamationsList] ❌ Exception:", new {
+                type = ex.GetType().Name,
+                message = ex.Message,
+                stackTrace = ex.StackTrace,
+                innerException = ex.InnerException?.Message
+            });
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged(); // Ensure UI updates
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+
+    private async Task FilterChanged()
+    {
+        await LoadReclamations();
+    }
+
+    private async Task ClearFilters()
+    {
+        _searchTerm = "";
+        _statusFilterValue = "";
+        _priorityFilterValue = "";
+        await LoadReclamations();
+    }
+
+    private async Task EditStatus(ReclamationListDto reclamation)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ReclamationId"] = reclamation.Id,
+            ["CurrentStatus"] = reclamation.Status
+        };
+        
+        var dialog = await DialogService.ShowAsync<UpdateStatusDialog>("Modifier le statut", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && result.Data is ReclamationDto updatedReclamation)
+        {
+            // Update the item in the list immediately
+            var index = _reclamations.FindIndex(r => r.Id == updatedReclamation.Id);
+            if (index >= 0)
+            {
+                _reclamations[index] = ConvertToListDto(updatedReclamation);
+                StateHasChanged();
+                Snackbar.Add("Statut mis à jour", Severity.Success);
+            }
+            else
+            {
+                // Fallback: reload if item not found
+                await LoadReclamations();
+                Snackbar.Add("Statut mis à jour", Severity.Success);
+            }
+        }
+        else if (!result.Canceled)
+        {
+            // Fallback: reload from server if data is not available
+            await LoadReclamations();
+            StateHasChanged();
+            Snackbar.Add("Statut mis à jour", Severity.Success);
+        }
+    }
+
+    private ReclamationListDto ConvertToListDto(ReclamationDto dto)
+    {
+        return new ReclamationListDto
+        {
+            Id = dto.Id,
+            ClientName = dto.ClientName,
+            ArticleName = dto.ArticleName,
+            Title = dto.Title,
+            Priority = dto.Priority,
+            Status = dto.Status,
+            IsUnderWarranty = dto.IsUnderWarranty,
+            SlaStatus = dto.SlaStatus,
+            AttachmentCount = dto.Attachments?.Count ?? 0,
+            InterventionCount = dto.InterventionCount,
+            CreatedAt = dto.CreatedAt
+        };
+    }
+
+    private string GetPriorityBadgeClass(Priority priority) => priority switch
+    {
+        Priority.Urgent => "bg-danger",
+        Priority.High => "bg-warning text-dark",
+        Priority.Medium => "bg-info",
+        _ => "bg-success"
+    };
+
+    private string GetPriorityLabel(Priority priority) => priority switch
+    {
+        Priority.Urgent => "Urgente",
+        Priority.High => "Haute",
+        Priority.Medium => "Moyenne",
+        Priority.Low => "Basse",
+        _ => priority.ToString()
+    };
+
+    private string GetStatusBadgeClass(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "bg-primary",
+        ReclamationStatus.InProgress => "bg-warning text-dark",
+        ReclamationStatus.Closed => "bg-success",
+        ReclamationStatus.Cancelled => "bg-secondary",
+        _ => "bg-info"
+    };
+
+    private string GetStatusLabel(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "Nouvelle",
+        ReclamationStatus.InProgress => "En cours",
+        ReclamationStatus.PendingIntervention => "Attente intervention",
+        ReclamationStatus.InterventionScheduled => "Intervention planifiée",
+        ReclamationStatus.UnderIntervention => "En intervention",
+        ReclamationStatus.PendingInvoice => "Attente facture",
+        ReclamationStatus.Closed => "Clôturée",
+        ReclamationStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    private string GetSlaBadgeClass(string slaStatus) => slaStatus switch
+    {
+        "Overdue" => "bg-danger",
+        "NearDeadline" => "bg-warning text-dark",
+        _ => "bg-success"
+    };
+
+    private string GetSlaLabel(string slaStatus) => slaStatus switch
+    {
+        "Overdue" => "En retard",
+        "NearDeadline" => "Proche",
+        _ => "À temps"
+    };
+}

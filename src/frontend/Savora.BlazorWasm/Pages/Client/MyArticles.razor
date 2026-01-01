@@ -1,0 +1,126 @@
+@page "/my-articles"
+@attribute [Authorize(Roles = "Client")]
+@inject IArticleService ArticleService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Mes Articles</PageTitle>
+
+<PageHeader Title="Mes Articles" Subtitle="Consultez les articles que vous avez achetés" Icon="package" />
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else if (!_articles.Any())
+{
+    <div class="card">
+        <div class="card-body empty-state">
+            <i data-feather="package" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+            <h5 class="mt-3">Aucun article</h5>
+            <p>Vous n'avez aucun article enregistré pour le moment.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var article in _articles)
+        {
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title mb-0">@article.Name</h5>
+                            <small class="text-muted">@article.Brand</small>
+                        </div>
+                        @if (article.IsUnderWarranty)
+                        {
+                            <span class="badge bg-success">
+                                <i data-feather="check-circle" class="me-1" style="width: 12px; height: 12px;"></i> Sous garantie
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Hors garantie</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <small class="text-muted d-block">Référence</small>
+                                <code>@article.Reference</code>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Catégorie</small>
+                                <span>@article.Category</span>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Date d'achat</small>
+                                <span>@article.PurchaseDate.ToString("dd/MM/yyyy")</span>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Fin de garantie</small>
+                                <span class="@(article.IsUnderWarranty ? "text-success" : "text-danger")">
+                                    @article.WarrantyEndDate.ToString("dd/MM/yyyy")
+                                </span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(article.SerialNumber))
+                            {
+                                <div class="col-12">
+                                    <small class="text-muted d-block">Numéro de série</small>
+                                    <code>@article.SerialNumber</code>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<ArticleDto> _articles = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadArticles();
+    }
+
+    private async Task LoadArticles()
+    {
+        _isLoading = true;
+        try
+        {
+            // Use the my-articles endpoint which automatically gets articles for the current client
+            var articlesResult = await ArticleService.GetMyArticlesAsync();
+            if (articlesResult.Success && articlesResult.Data != null)
+            {
+                _articles = articlesResult.Data;
+            }
+            else
+            {
+                Snackbar.Add(articlesResult.Message ?? "Erreur lors du chargement des articles", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

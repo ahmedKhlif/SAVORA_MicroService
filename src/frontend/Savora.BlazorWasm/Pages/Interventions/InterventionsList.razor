@@ -1,0 +1,229 @@
+@page "/interventions"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IInterventionService InterventionService
+@inject ITechnicianService TechnicianService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Interventions</PageTitle>
+
+<PageHeader Title="Interventions" Subtitle="Planifiez et suivez les interventions techniques" Icon="tool">
+    <button type="button" class="btn btn-primary" @onclick="@(() => Navigation.NavigateTo("/interventions/new"))">
+        <i data-feather="plus" class="me-2"></i> Nouvelle intervention
+    </button>
+</PageHeader>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Statut</label>
+                <select class="form-select" @bind="_statusFilterValue" @bind:after="FilterChanged">
+                    <option value="">Tous les statuts</option>
+                    @foreach (InterventionStatus status in Enum.GetValues(typeof(InterventionStatus)))
+                    {
+                        <option value="@status">@GetStatusLabel(status)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Technicien</label>
+                <select class="form-select" @bind="_technicianFilterValue" @bind:after="FilterChanged">
+                    <option value="">Tous les techniciens</option>
+                    @foreach (var tech in _technicians)
+                    {
+                        <option value="@tech.Id">@tech.FullName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                    <i data-feather="x" class="me-1"></i> Effacer filtres
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Liste des interventions (@_interventions.Count)</h5>
+    </div>
+    @if (_isLoading)
+    {
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (_interventions.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover my-0">
+                <thead>
+                    <tr>
+                        <th>Réclamation</th>
+                        <th>Client</th>
+                        <th>Technicien</th>
+                        <th class="d-none d-md-table-cell">Date</th>
+                        <th>Statut</th>
+                        <th>Type</th>
+                        <th class="d-none d-lg-table-cell">Montant</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _interventions)
+                    {
+                        <tr>
+                            <td>
+                                <a href="/interventions/@item.Id" class="text-primary fw-medium">
+                                    @item.ReclamationTitle
+                                </a>
+                            </td>
+                            <td>@item.ClientName</td>
+                            <td>
+                                @if (string.IsNullOrEmpty(item.TechnicianName))
+                                {
+                                    <span class="badge bg-warning text-dark">Non assigné</span>
+                                }
+                                else
+                                {
+                                    @item.TechnicianName
+                                }
+                            </td>
+                            <td class="d-none d-md-table-cell">@item.PlannedDate.ToString("dd/MM/yyyy")</td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClass(item.Status)">
+                                    @GetStatusLabel(item.Status)
+                                </span>
+                            </td>
+                            <td>
+                                @if (item.IsFree)
+                                {
+                                    <span class="badge bg-success">Gratuite</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-info">Payante</span>
+                                }
+                            </td>
+                            <td class="d-none d-lg-table-cell">
+                                @if (item.IsFree)
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                                else
+                                {
+                                    <strong>@item.TotalAmount.ToString("N2") TND</strong>
+                                }
+                            </td>
+                            <td>
+                                <a href="/interventions/@item.Id" class="btn btn-sm btn-outline-primary" title="Voir">
+                                    <i data-feather="eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="card-body empty-state">
+            <i data-feather="tool" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+            <h5 class="mt-3">Aucune intervention trouvée</h5>
+            <p>Modifiez vos filtres pour voir plus de résultats.</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<InterventionListDto> _interventions = new();
+    private List<TechnicianDto> _technicians = new();
+    private bool _isLoading = true;
+    private string _statusFilterValue = "";
+    private string _technicianFilterValue = "";
+    private InterventionStatus? _statusFilter => string.IsNullOrEmpty(_statusFilterValue) ? null : Enum.Parse<InterventionStatus>(_statusFilterValue);
+    private Guid? _technicianFilter => string.IsNullOrEmpty(_technicianFilterValue) ? null : Guid.Parse(_technicianFilterValue);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTechnicians();
+        await LoadInterventions();
+    }
+
+    private async Task LoadTechnicians()
+    {
+        try
+        {
+            var result = await TechnicianService.GetAllAsync(1, 100);
+            if (result.Success && result.Data != null)
+            {
+                _technicians = result.Data.Items;
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadInterventions()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await InterventionService.GetAllAsync(1, 100, _statusFilter, _technicianFilter);
+            if (result.Success && result.Data != null)
+            {
+                _interventions = result.Data.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task FilterChanged()
+    {
+        await LoadInterventions();
+    }
+
+    private async Task ClearFilters()
+    {
+        _statusFilterValue = "";
+        _technicianFilterValue = "";
+        await LoadInterventions();
+    }
+
+    private string GetStatusBadgeClass(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "bg-info",
+        InterventionStatus.InProgress => "bg-warning text-dark",
+        InterventionStatus.Completed => "bg-success",
+        InterventionStatus.Cancelled => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusLabel(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "Planifiée",
+        InterventionStatus.InProgress => "En cours",
+        InterventionStatus.Completed => "Terminée",
+        InterventionStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

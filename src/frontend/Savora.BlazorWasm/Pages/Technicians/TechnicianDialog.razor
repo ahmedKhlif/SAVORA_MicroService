@@ -1,0 +1,187 @@
+@inject ITechnicianService TechnicianService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_model.FullName" Label="Nom complet" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" />
+        
+        <MudTextField @bind-Value="_model.Email" Label="Email" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" InputType="InputType.Email" />
+        
+        <MudTextField @bind-Value="_model.Phone" Label="Téléphone" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" />
+
+        <MudText Typo="Typo.body2" Class="mb-2">Compétences</MudText>
+        <MudChipSet T="string" AllClosable="true" OnClose="RemoveSkill">
+            @foreach (var skill in _skills)
+            {
+                <MudChip T="string" Value="@skill">@skill</MudChip>
+            }
+        </MudChipSet>
+        
+        <div class="d-flex gap-2 mt-2">
+            <MudAutocomplete T="string" @bind-Value="_newSkill" Label="Ajouter une compétence" 
+                           Variant="Variant.Outlined" Margin="Margin.Dense" 
+                           SearchFunc="SearchSkills" MaxItems="10" 
+                           ResetValueOnEmptyText="true" 
+                           CoerceText="true" CoerceValue="false"
+                           Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                           OnSelectionChanged="OnSkillSelected" />
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="AddSkill"
+                       Disabled="@string.IsNullOrWhiteSpace(_newSkill)">
+                Ajouter
+            </MudButton>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_isLoading">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Enregistrer
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public TechnicianDto? Technician { get; set; }
+
+    private CreateTechnicianRequest _model = new();
+    private List<string> _skills = new();
+    private string _newSkill = "";
+    private bool _isLoading = false;
+    private bool _isEdit => Technician != null;
+
+    // Liste de compétences suggérées
+    private readonly List<string> _suggestedSkills = new()
+    {
+        "Chauffage",
+        "Chaudière",
+        "Pompe à chaleur",
+        "Sanitaire",
+        "Plomberie",
+        "Eau chaude",
+        "Climatisation",
+        "Ventilation",
+        "Électricité",
+        "Dépannage",
+        "Installation",
+        "Maintenance",
+        "Réparation",
+        "Diagnostic",
+        "Ballon d'eau chaude",
+        "Radiateur",
+        "Chauffe-eau",
+        "Pompe",
+        "Filtre",
+        "Détartrage",
+        "Gaz",
+        "Fioul",
+        "Énergie solaire",
+        "Pompe à chaleur air/eau",
+        "Pompe à chaleur air/air",
+        "VMC",
+        "Réseau hydraulique"
+    };
+
+    protected override void OnInitialized()
+    {
+        if (Technician != null)
+        {
+            _model.FullName = Technician.FullName;
+            _model.Email = Technician.Email;
+            _model.Phone = Technician.Phone;
+            _skills = new List<string>(Technician.Skills);
+        }
+    }
+
+    private Task<IEnumerable<string>> SearchSkills(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Task.FromResult(_suggestedSkills.Where(s => !_skills.Contains(s)));
+        }
+
+        return Task.FromResult(_suggestedSkills
+            .Where(s => s.Contains(value, StringComparison.OrdinalIgnoreCase) && !_skills.Contains(s))
+            .Take(10));
+    }
+
+    private void OnSkillSelected(string selectedSkill)
+    {
+        if (!string.IsNullOrWhiteSpace(selectedSkill))
+        {
+            _newSkill = selectedSkill;
+        }
+    }
+
+    private void AddSkill()
+    {
+        if (!string.IsNullOrWhiteSpace(_newSkill) && !_skills.Contains(_newSkill))
+        {
+            _skills.Add(_newSkill);
+            _newSkill = "";
+        }
+    }
+
+    private void RemoveSkill(MudChip chip)
+    {
+        if (chip.Text != null) _skills.Remove(chip.Text);
+    }
+
+    private async Task Submit()
+    {
+        _isLoading = true;
+        try
+        {
+            _model.Skills = _skills;
+            
+            if (_isEdit)
+            {
+                var updateRequest = new UpdateTechnicianRequest
+                {
+                    FullName = _model.FullName,
+                    Phone = _model.Phone,
+                    Skills = _skills,
+                    IsAvailable = Technician!.IsAvailable
+                };
+                var result = await TechnicianService.UpdateAsync(Technician.Id, updateRequest);
+                if (result.Success)
+                {
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result.Message ?? "Erreur lors de la modification du technicien", Severity.Error);
+                }
+            }
+            else
+            {
+                var result = await TechnicianService.CreateAsync(_model);
+                if (result.Success)
+                {
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result.Message ?? "Erreur lors de la création du technicien", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

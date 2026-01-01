@@ -1,0 +1,154 @@
+@page "/login"
+@layout EmptyLayout
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<main class="d-flex w-100 h-100">
+    <div class="container d-flex flex-column">
+        <div class="row vh-100">
+            <div class="col-sm-10 col-md-8 col-lg-6 col-xl-5 mx-auto d-table h-100">
+                <div class="d-table-cell align-middle">
+
+                    <div class="text-center mt-4">
+                        <img src="img/logo.png" alt="SAVORA" height="64" class="mb-3" />
+                        <h1 class="h2 savora-logo">SAVORA</h1>
+                        <p class="lead text-muted">
+                            Smart After-Sales Service, Simplified.
+                        </p>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="m-sm-3">
+                                <h4 class="mb-4">Connexion</h4>
+                                
+                                <EditForm Model="@_model" OnValidSubmit="HandleLogin">
+                                    <DataAnnotationsValidator />
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Email</label>
+                                        <InputText @bind-Value="_model.Email" 
+                                                   type="email"
+                                                   class="form-control form-control-lg" 
+                                                   placeholder="Entrez votre email" />
+                                        <ValidationMessage For="@(() => _model.Email)" class="text-danger small" />
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Mot de passe</label>
+                                        <div class="input-group">
+                                            <InputText @bind-Value="_model.Password" 
+                                                       type="@(_showPassword ? "text" : "password")"
+                                                       class="form-control form-control-lg" 
+                                                       placeholder="Entrez votre mot de passe" />
+                                            <button class="btn btn-outline-secondary" type="button" @onclick="TogglePasswordVisibility">
+                                                <i data-feather="@(_showPassword ? "eye-off" : "eye")"></i>
+                                            </button>
+                                        </div>
+                                        <ValidationMessage For="@(() => _model.Password)" class="text-danger small" />
+                                    </div>
+
+                                    <div class="d-grid gap-2 mt-4">
+                                        <button type="submit" class="btn btn-lg btn-primary" disabled="@_isLoading">
+                                            @if (_isLoading)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                <span>Connexion...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Se connecter</span>
+                                            }
+                                        </button>
+                                    </div>
+                                </EditForm>
+
+                                <div class="text-end mt-2">
+                                    <a href="/forgot-password" class="text-muted small">
+                                        Mot de passe oublié?
+                                    </a>
+                                </div>
+
+                                <hr class="my-4" />
+
+                                <div class="text-center">
+                                    <p class="mb-0">
+                                        Pas encore de compte ?
+                                        <a href="/register" class="text-primary">S'inscrire</a>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Demo Accounts Card -->
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <div class="alert alert-info mb-0" role="alert">
+                                <h6 class="alert-heading mb-2">
+                                    <i data-feather="info" class="me-1"></i> Comptes de démonstration
+                                </h6>
+                                <p class="mb-1 small"><strong>Admin:</strong> admin@savora.com / Admin@123</p>
+                                <p class="mb-0 small"><strong>Client:</strong> client@savora.com / Client@123</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+@code {
+    private LoginRequest _model = new();
+    private bool _isLoading = false;
+    private bool _showPassword = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialize Feather icons after first render
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+    }
+
+    private async Task TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+        // Re-initialize Feather icons after state change
+        await Task.Delay(10); // Small delay to ensure DOM is updated
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        
+        try
+        {
+            var result = await AuthService.LoginAsync(_model);
+            
+            if (result.Success)
+            {
+                Snackbar.Add("Connexion réussie!", Severity.Success);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

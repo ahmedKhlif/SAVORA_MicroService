@@ -1,0 +1,356 @@
+@page "/users/{UserId:guid}"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IAuthService AuthService
+@inject IClientService ClientService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Profil Utilisateur</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else if (_user == null)
+{
+    <div class="alert alert-danger">
+        <i data-feather="alert-circle" class="me-2"></i> Utilisateur non trouvé
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <a href="/users" class="btn btn-link text-muted ps-0">
+            <i data-feather="arrow-left" class="me-2"></i> Retour à la liste des utilisateurs
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Profile Header -->
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="profile-picture-container me-4">
+                            @if (!string.IsNullOrEmpty(_user.ProfilePictureUrl))
+                            {
+                                <img src="@_user.ProfilePictureUrl" alt="@_user.FullName" class="profile-picture-large" />
+                            }
+                            else
+                            {
+                                <div class="profile-picture-large profile-picture-placeholder">
+                                    <i data-feather="user" style="width: 64px; height: 64px;"></i>
+                                </div>
+                            }
+                        </div>
+                        <div class="flex-grow-1">
+                            <h2 class="mb-1">@_user.FullName</h2>
+                            <p class="text-muted mb-2">@_user.Email</p>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <span class="badge @(_user.Role == "ResponsableSAV" ? "bg-primary" : "bg-secondary")">
+                                    @(_user.Role == "ResponsableSAV" ? "Responsable SAV" : "Client")
+                                </span>
+                                @if (_user.IsBlocked)
+                                {
+                                    <span class="badge bg-danger">Bloqué</span>
+                                }
+                                else if (!_user.IsActive)
+                                {
+                                    <span class="badge bg-warning">Inactif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">Actif</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            @if (_user.IsBlocked)
+                            {
+                                <button type="button" class="btn btn-success" @onclick="UnblockUser">
+                                    <i data-feather="unlock" class="me-2"></i> Débloquer
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-warning" @onclick="BlockUser">
+                                    <i data-feather="lock" class="me-2"></i> Bloquer
+                                </button>
+                            }
+                            <button type="button" class="btn btn-primary" @onclick="ChangeRole">
+                                <i data-feather="user-check" class="me-2"></i> Changer le rôle
+                            </button>
+                            <button type="button" class="btn btn-danger" @onclick="DeleteUser">
+                                <i data-feather="trash-2" class="me-2"></i> Supprimer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Information -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="info" class="me-2"></i> Informations
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Nom complet</label>
+                        <p class="mb-0 fw-medium">@_user.FullName</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Email</label>
+                        <p class="mb-0">@_user.Email</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Rôle</label>
+                        <div>
+                            <span class="badge @(_user.Role == "ResponsableSAV" ? "bg-primary" : "bg-secondary")">
+                                @(_user.Role == "ResponsableSAV" ? "Responsable SAV" : "Client")
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Compte créé le</label>
+                        <p class="mb-0">@_user.CreatedAt.ToString("dd MMMM yyyy à HH:mm")</p>
+                    </div>
+                    @if (_user.LastLoginAt.HasValue)
+                    {
+                        <div class="mb-0">
+                            <label class="form-label text-muted small">Dernière connexion</label>
+                            <p class="mb-0">@_user.LastLoginAt.Value.ToString("dd MMMM yyyy à HH:mm")</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Status -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="shield" class="me-2"></i> Statut du compte
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Statut</label>
+                        <div>
+                            @if (_user.IsBlocked)
+                            {
+                                <span class="badge bg-danger">Bloqué</span>
+                            }
+                            else if (!_user.IsActive)
+                            {
+                                <span class="badge bg-warning">Inactif</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success">Actif</span>
+                            }
+                        </div>
+                    </div>
+                    @if (_user.IsBlocked && _user.BlockedAt.HasValue)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Bloqué le</label>
+                            <p class="mb-0">@_user.BlockedAt.Value.ToString("dd MMMM yyyy à HH:mm")</p>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_user.BlockReason))
+                        {
+                            <div class="mb-0">
+                                <label class="form-label text-muted small">Raison du blocage</label>
+                                <p class="mb-0">@_user.BlockReason</p>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Client Information (if applicable) -->
+        @if (_user.Role == "Client" && _client != null)
+        {
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="user-check" class="me-2"></i> Informations client
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted small">Téléphone</label>
+                                <p class="mb-0">@(_client.Phone ?? "-")</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted small">Adresse</label>
+                                <p class="mb-0">@(_client.Address ?? "-")</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted small">Ville</label>
+                                <p class="mb-0">@(_client.City ?? "-")</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted small">Réclamations totales</label>
+                                <p class="mb-0 fw-bold">@_client.TotalReclamations</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted small">Réclamations actives</label>
+                                <p class="mb-0 fw-bold">@_client.ActiveReclamations</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted small">Articles enregistrés</label>
+                                <p class="mb-0 fw-bold">@_client.TotalArticles</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid UserId { get; set; }
+    
+    private UserDto? _user;
+    private ClientDto? _client;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserProfile();
+    }
+
+    private async Task LoadUserProfile()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await AuthService.GetUserByIdAsync(UserId);
+            if (result.Success && result.Data != null)
+            {
+                _user = result.Data;
+                
+                if (_user.Role == "Client")
+                {
+                    var clientResult = await ClientService.GetByUserIdAsync(UserId);
+                    if (clientResult.Success)
+                    {
+                        _client = clientResult.Data;
+                    }
+                }
+            }
+            else
+            {
+                Snackbar.Add("Utilisateur non trouvé", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task BlockUser()
+    {
+        var parameters = new DialogParameters<BlockUserDialog>
+        {
+            { x => x.UserId, UserId },
+            { x => x.UserName, _user!.FullName }
+        };
+        
+        var dialog = await DialogService.ShowAsync<BlockUserDialog>("Bloquer l'utilisateur", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadUserProfile();
+        }
+    }
+
+    private async Task UnblockUser()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Débloquer l'utilisateur",
+            $"Êtes-vous sûr de vouloir débloquer {_user!.FullName}?",
+            yesText: "Oui", cancelText: "Non");
+        
+        if (confirmed == true)
+        {
+            var result = await AuthService.UnblockUserAsync(UserId);
+            if (result.Success)
+            {
+                Snackbar.Add("Utilisateur débloqué avec succès", Severity.Success);
+                await LoadUserProfile();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors du déblocage", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ChangeRole()
+    {
+        var parameters = new DialogParameters<ChangeRoleDialog>
+        {
+            { x => x.UserId, UserId },
+            { x => x.CurrentRole, _user!.Role },
+            { x => x.UserName, _user.FullName }
+        };
+        
+        var dialog = await DialogService.ShowAsync<ChangeRoleDialog>("Changer le rôle", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadUserProfile();
+        }
+    }
+
+    private async Task DeleteUser()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Supprimer l'utilisateur",
+            $"Êtes-vous sûr de vouloir supprimer le compte de {_user!.FullName}? Cette action est irréversible.",
+            yesText: "Supprimer", cancelText: "Annuler");
+        
+        if (confirmed == true)
+        {
+            var result = await AuthService.DeleteUserAsync(UserId);
+            if (result.Success)
+            {
+                Snackbar.Add("Utilisateur supprimé avec succès", Severity.Success);
+                Navigation.NavigateTo("/users");
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la suppression", Severity.Error);
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}
+

@@ -1,0 +1,238 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # DATABASES
+  # ==========================================
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: savora-postgres-auth
+    environment:
+      POSTGRES_DB: savora_auth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - savora-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-articles:
+    image: postgres:15-alpine
+    container_name: savora-postgres-articles
+    environment:
+      POSTGRES_DB: savora_articles
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-articles-data:/var/lib/postgresql/data
+    networks:
+      - savora-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-reclamations:
+    image: postgres:15-alpine
+    container_name: savora-postgres-reclamations
+    environment:
+      POSTGRES_DB: savora_reclamations
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-reclamations-data:/var/lib/postgresql/data
+    networks:
+      - savora-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-interventions:
+    image: postgres:15-alpine
+    container_name: savora-postgres-interventions
+    environment:
+      POSTGRES_DB: savora_interventions
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-interventions-data:/var/lib/postgresql/data
+    networks:
+      - savora-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # MICROSERVICES
+  # ==========================================
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/AuthService/Dockerfile
+    container_name: savora-auth-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-auth;Port=5432;Database=savora_auth;Username=postgres;Password=postgres
+    ports:
+      - "5001:80"
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+    networks:
+      - savora-network
+    restart: unless-stopped
+
+  articles-service:
+    build:
+      context: .
+      dockerfile: services/ArticlesService/Dockerfile
+    container_name: savora-articles-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-articles;Port=5432;Database=savora_articles;Username=postgres;Password=postgres
+    ports:
+      - "5002:80"
+    depends_on:
+      postgres-articles:
+        condition: service_healthy
+    networks:
+      - savora-network
+    restart: unless-stopped
+
+  reclamations-service:
+    build:
+      context: .
+      dockerfile: services/ReclamationsService/Dockerfile
+    container_name: savora-reclamations-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-reclamations;Port=5432;Database=savora_reclamations;Username=postgres;Password=postgres
+      - Services__ArticlesServiceUrl=http://articles-service:80
+      - SmtpSettings__EnableEmail=true
+      - SmtpSettings__Host=smtp.gmail.com
+      - SmtpSettings__Port=587
+      - SmtpSettings__Username=khlifahmed9@gmail.com
+      - SmtpSettings__Password=xsjn avxo gqbg bcag
+      - SmtpSettings__FromEmail=khlifahmed9@gmail.com
+      - SmtpSettings__FromName=SAVORA
+      - SmtpSettings__BaseUrl=http://localhost:5000
+    ports:
+      - "5003:80"
+    depends_on:
+      postgres-reclamations:
+        condition: service_healthy
+      articles-service:
+        condition: service_started
+    networks:
+      - savora-network
+    restart: unless-stopped
+
+  interventions-service:
+    build:
+      context: .
+      dockerfile: services/InterventionsService/Dockerfile
+    container_name: savora-interventions-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres-interventions;Port=5432;Database=savora_interventions;Username=postgres;Password=postgres
+      - Services__ArticlesServiceUrl=http://articles-service:80
+      - Services__ReclamationsServiceUrl=http://reclamations-service:80
+      - SmtpSettings__EnableEmail=true
+      - SmtpSettings__Host=smtp.gmail.com
+      - SmtpSettings__Port=587
+      - SmtpSettings__Username=khlifahmed9@gmail.com
+      - SmtpSettings__Password=xsjn avxo gqbg bcag
+      - SmtpSettings__FromEmail=khlifahmed9@gmail.com
+      - SmtpSettings__FromName=SAVORA
+      - SmtpSettings__BaseUrl=http://localhost:5000
+    ports:
+      - "5004:80"
+    depends_on:
+      postgres-interventions:
+        condition: service_healthy
+      articles-service:
+        condition: service_started
+    networks:
+      - savora-network
+    restart: unless-stopped
+
+  # ==========================================
+  # API GATEWAY
+  # ==========================================
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/ApiGateway/Dockerfile
+    container_name: savora-api-gateway
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ReverseProxy__Clusters__auth-cluster__Destinations__auth-service__Address=http://auth-service:80
+      - ReverseProxy__Clusters__articles-cluster__Destinations__articles-service__Address=http://articles-service:80
+      - ReverseProxy__Clusters__reclamations-cluster__Destinations__reclamations-service__Address=http://reclamations-service:80
+      - ReverseProxy__Clusters__interventions-cluster__Destinations__interventions-service__Address=http://interventions-service:80
+    ports:
+      - "5010:80"
+    depends_on:
+      - auth-service
+      - articles-service
+      - reclamations-service
+      - interventions-service
+    networks:
+      - savora-network
+    restart: unless-stopped
+
+  # ==========================================
+  # FRONTEND
+  # ==========================================
+  blazor-frontend:
+    build:
+      context: .
+      dockerfile: frontend/Savora.BlazorWasm/Dockerfile
+    container_name: savora-frontend
+    ports:
+      - "5000:80"
+    depends_on:
+      - auth-service
+      - articles-service
+      - reclamations-service
+      - interventions-service
+    networks:
+      - savora-network
+    restart: unless-stopped
+
+# ==========================================
+# NETWORKS & VOLUMES
+# ==========================================
+networks:
+  savora-network:
+    driver: bridge
+
+volumes:
+  postgres-auth-data:
+  postgres-articles-data:
+  postgres-reclamations-data:
+  postgres-interventions-data:
+

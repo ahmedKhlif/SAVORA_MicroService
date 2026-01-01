@@ -1,0 +1,436 @@
+@page "/messages"
+@attribute [Authorize]
+@using MudBlazor
+@inject IMessageService MessageService
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+<PageTitle>SAVORA - Messages</PageTitle>
+
+<PageHeader Title="Messages" Subtitle="Communiquez avec les utilisateurs" Icon="mail">
+    <button type="button" class="btn btn-primary" @onclick="ShowNewMessageDialog">
+        <i data-feather="plus" class="me-2"></i> Nouveau message
+    </button>
+</PageHeader>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row">
+        <!-- Conversations List -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Conversations</h5>
+                </div>
+                <div class="card-body p-0">
+                    @if (_conversations.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var conv in _conversations)
+                            {
+                                <a href="#" class="list-group-item list-group-item-action @(_selectedConversation?.OtherUserId == conv.OtherUserId ? "active" : "")" 
+                                   @onclick="@(() => SelectConversation(conv.OtherUserId))" @onclick:preventDefault>
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3">
+                                            @if (!string.IsNullOrEmpty(conv.OtherUserProfilePicture))
+                                            {
+                                                <img src="@GetImageUrl(conv.OtherUserProfilePicture)" alt="@conv.OtherUserName" 
+                                                     class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;" 
+                                                     onerror="this.style.display='none';" />
+                                            }
+                                            else
+                                            {
+                                                <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                                     style="width: 40px; height: 40px; background: linear-gradient(135deg, #2563EB, #1E40AF); color: white;">
+                                                    <i data-feather="user" style="width: 20px; height: 20px;"></i>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <h6 class="mb-0">@conv.OtherUserName</h6>
+                                                    <small class="text-muted">@conv.LastMessagePreview</small>
+                                                </div>
+                                                <div class="text-end">
+                                                    @if (conv.UnreadCount > 0)
+                                                    {
+                                                        <span class="badge bg-primary rounded-pill">@conv.UnreadCount</span>
+                                                    }
+                                                    <small class="d-block text-muted">@GetTimeAgo(conv.LastMessageDate)</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card-body empty-state">
+                            <i data-feather="inbox" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+                            <h5 class="mt-3">Aucune conversation</h5>
+                            <p>Commencez une nouvelle conversation</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages View -->
+        <div class="col-md-8 mb-4">
+            @if (_selectedConversation == null)
+            {
+                <div class="card">
+                    <div class="card-body empty-state">
+                        <i data-feather="message-circle" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+                        <h5 class="mt-3">Sélectionnez une conversation</h5>
+                        <p>Choisissez une conversation dans la liste pour voir les messages</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            @if (!string.IsNullOrEmpty(_selectedConversation.OtherUserProfilePicture))
+                            {
+                                <img src="@GetImageUrl(_selectedConversation.OtherUserProfilePicture)" alt="@_selectedConversation.OtherUserName" 
+                                     class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;" 
+                                     onerror="this.style.display='none';" />
+                            }
+                            else
+                            {
+                                <div class="rounded-circle d-flex align-items-center justify-content-center me-2" 
+                                     style="width: 32px; height: 32px; background: linear-gradient(135deg, #2563EB, #1E40AF); color: white;">
+                                    <i data-feather="user" style="width: 16px; height: 16px;"></i>
+                                </div>
+                            }
+                            <h5 class="card-title mb-0">@_selectedConversation.OtherUserName</h5>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="MarkConversationAsRead">
+                            <i data-feather="check" class="me-1"></i> Marquer comme lu
+                        </button>
+                    </div>
+                    <div class="card-body" style="max-height: 500px; overflow-y: auto;" id="messages-container">
+                        @if (_messages.Any())
+                        {
+                            @foreach (var message in _messages)
+                            {
+                                var isFromMe = message.SenderId == _currentUserId;
+                                <div class="d-flex mb-3 @(isFromMe ? "justify-content-end" : "justify-content-start")">
+                                    <div class="message-bubble @(isFromMe ? "message-sent" : "message-received")">
+                                        <div class="d-flex align-items-center mb-1">
+                                            @if (!isFromMe && !string.IsNullOrEmpty(message.SenderProfilePicture))
+                                            {
+                                                <img src="@GetImageUrl(message.SenderProfilePicture)" alt="@message.SenderName" 
+                                                     class="rounded-circle me-2" style="width: 24px; height: 24px; object-fit: cover;" 
+                                                     onerror="this.style.display='none';" />
+                                            }
+                                            <strong class="me-2">@message.SenderName</strong>
+                                            <small class="text-muted">@message.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(message.Subject))
+                                        {
+                                            <div class="fw-bold mb-1">@message.Subject</div>
+                                        }
+                                        <div>@message.Content</div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-4">
+                                <p>Aucun message dans cette conversation</p>
+                            </div>
+                        }
+                    </div>
+                    <div class="card-footer bg-light">
+                        <div class="d-flex align-items-center mb-2">
+                            <i data-feather="edit-3" class="me-2" style="width: 16px; height: 16px; color: #6B7280;"></i>
+                            <small class="text-muted">Composer un message</small>
+                        </div>
+                        <EditForm Model="@_newMessageModel" OnValidSubmit="SendMessage">
+                            <DataAnnotationsValidator />
+                            <div class="mb-2">
+                                <MudAutocomplete T="string" @bind-Value="_newMessageModel.Subject" 
+                                                Label="Sujet (optionnel)" 
+                                                Variant="Variant.Outlined" 
+                                                Dense="true"
+                                                SearchFunc="@SearchSubjects"
+                                                ToStringFunc="@(s => s ?? string.Empty)"
+                                                Placeholder="Ex: Question sur ma réclamation"
+                                                MaxItems="10" />
+                            </div>
+                            <div class="input-group">
+                                <textarea @bind="_newMessageModel.Content" @bind:event="oninput" 
+                                          class="form-control" 
+                                          placeholder="Tapez votre message..." 
+                                          rows="3"
+                                          style="resize: none;"></textarea>
+                                <button type="submit" class="btn btn-primary" disabled="@(_isSending || string.IsNullOrWhiteSpace(_newMessageModel.Content))">
+                                    @if (_isSending)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                        <span>Envoi...</span>
+                                    }
+                                    else
+                                    {
+                                        <i data-feather="send" class="me-1"></i>
+                                        <span>Envoyer</span>
+                                    }
+                                </button>
+                            </div>
+                            <ValidationMessage For="@(() => _newMessageModel.Content)" class="text-danger small mt-1" />
+                        </EditForm>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<MessageListDto> _conversations = new();
+    private MessageListDto? _selectedConversation;
+    private List<MessageDto> _messages = new();
+    private Guid _currentUserId = Guid.Empty;
+    private bool _isLoading = true;
+    private bool _isSending = false;
+    private CreateMessageModel _newMessageModel = new();
+    
+    private readonly List<string> _subjectSuggestions = new()
+    {
+        "Question sur ma réclamation",
+        "Demande d'information sur l'intervention",
+        "Problème avec mon article",
+        "Demande de rendez-vous",
+        "Question sur la garantie",
+        "Suivi de ma réclamation",
+        "Demande de pièce détachée",
+        "Question sur la facture",
+        "Problème technique",
+        "Demande de devis",
+        "Réclamation urgente",
+        "Question sur le statut",
+        "Demande d'assistance",
+        "Information complémentaire",
+        "Question sur les délais",
+        "Demande de modification",
+        "Problème de livraison",
+        "Question sur le paiement",
+        "Demande de documentation",
+        "Autre question"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentUser();
+        await LoadConversations();
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        var userResult = await AuthService.GetCurrentUserAsync();
+        if (userResult.Success && userResult.Data != null)
+        {
+            _currentUserId = userResult.Data.Id;
+        }
+    }
+
+    private async Task LoadConversations()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await MessageService.GetConversationsAsync();
+            if (result.Success && result.Data != null)
+            {
+                _conversations = result.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SelectConversation(Guid otherUserId)
+    {
+        _selectedConversation = _conversations.FirstOrDefault(c => c.OtherUserId == otherUserId);
+        if (_selectedConversation != null)
+        {
+            await LoadMessages(otherUserId);
+            _newMessageModel.ReceiverId = otherUserId;
+        }
+    }
+
+    private async Task LoadMessages(Guid otherUserId)
+    {
+        try
+        {
+            var result = await MessageService.GetConversationAsync(otherUserId);
+            if (result.Success && result.Data != null)
+            {
+                _messages = result.Data;
+                StateHasChanged();
+                
+                // Scroll to bottom
+                await Task.Delay(100);
+                await JSRuntime.InvokeVoidAsync("scrollToBottom", "messages-container");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_newMessageModel.Content))
+        {
+            Snackbar.Add("Le message ne peut pas être vide", Severity.Warning);
+            return;
+        }
+
+        _isSending = true;
+        try
+        {
+            var request = new CreateMessageRequest
+            {
+                ReceiverId = _newMessageModel.ReceiverId,
+                Subject = _newMessageModel.Subject ?? "",
+                Content = _newMessageModel.Content
+            };
+
+            var result = await MessageService.SendMessageAsync(request);
+            if (result.Success)
+            {
+                Snackbar.Add("Message envoyé", Severity.Success);
+                _newMessageModel = new CreateMessageModel { ReceiverId = _newMessageModel.ReceiverId };
+                await LoadMessages(_newMessageModel.ReceiverId);
+                await LoadConversations();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de l'envoi", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSending = false;
+        }
+    }
+
+    private async Task MarkConversationAsRead()
+    {
+        if (_selectedConversation == null) return;
+
+        var result = await MessageService.MarkConversationAsReadAsync(_selectedConversation.OtherUserId);
+        if (result.Success)
+        {
+            await LoadConversations();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowNewMessageDialog()
+    {
+        var parameters = new DialogParameters<NewMessageDialog>
+        {
+            { x => x.CurrentUserId, _currentUserId }
+        };
+        
+        var dialog = await DialogService.ShowAsync<NewMessageDialog>("Nouveau message", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadConversations();
+        }
+    }
+
+    private Task<IEnumerable<string>> SearchSubjects(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult<IEnumerable<string>>(_subjectSuggestions);
+
+        var filtered = _subjectSuggestions
+            .Where(s => s.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return Task.FromResult<IEnumerable<string>>(filtered);
+    }
+
+    private string GetTimeAgo(DateTime date)
+    {
+        var timeSpan = DateTime.UtcNow - date;
+        if (timeSpan.TotalMinutes < 1) return "À l'instant";
+        if (timeSpan.TotalMinutes < 60) return $"{(int)timeSpan.TotalMinutes} min";
+        if (timeSpan.TotalHours < 24) return $"{(int)timeSpan.TotalHours} h";
+        if (timeSpan.TotalDays < 7) return $"{(int)timeSpan.TotalDays} j";
+        return date.ToString("dd/MM/yyyy");
+    }
+
+    private string GetImageUrl(string? relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return string.Empty;
+
+        // If already a full URL, return as is
+        if (relativePath.StartsWith("http://") || relativePath.StartsWith("https://"))
+            return relativePath;
+
+        // Use API Gateway if enabled, otherwise use AuthService directly
+        var useGateway = Configuration.GetValue<bool>("ApiSettings:UseGateway", false);
+        if (useGateway)
+        {
+            var gatewayUrl = Configuration["ApiSettings:GatewayUrl"] ?? "http://localhost:5010";
+            return $"{gatewayUrl}{relativePath}";
+        }
+        else
+        {
+            var authServiceUrl = Configuration["ApiSettings:AuthServiceUrl"] ?? "http://localhost:5001";
+            return $"{authServiceUrl}{relativePath}";
+        }
+    }
+
+    public class CreateMessageModel
+    {
+        public Guid ReceiverId { get; set; }
+        public string? Subject { get; set; }
+        
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Le message est requis")]
+        public string Content { get; set; } = string.Empty;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}
+

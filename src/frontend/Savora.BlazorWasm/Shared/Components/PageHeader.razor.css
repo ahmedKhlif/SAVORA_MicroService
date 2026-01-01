@@ -1,0 +1,12 @@
+/* Page Header Styles */
+::deep h1 {
+    font-weight: 600;
+    color: #1E293B;
+    margin-bottom: 0.5rem;
+}
+
+::deep .text-muted {
+    font-size: 0.95rem;
+    color: #64748B;
+}
+

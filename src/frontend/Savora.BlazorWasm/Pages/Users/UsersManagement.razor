@@ -1,0 +1,269 @@
+@page "/users"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Gestion des Utilisateurs</PageTitle>
+
+<PageHeader Title="Gestion des Utilisateurs" Subtitle="Gérez les utilisateurs, leurs rôles et leurs statuts" Icon="users" />
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Liste des utilisateurs (@_users.Count)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Email</th>
+                            <th>Rôle</th>
+                            <th>Statut</th>
+                            <th>Date création</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in _users)
+                        {
+                            <tr>
+                                <td>@user.FullName</td>
+                                <td>@user.Email</td>
+                                <td>
+                                    <span class="badge @(user.Role == "ResponsableSAV" ? "bg-primary" : "bg-secondary")">
+                                        @(user.Role == "ResponsableSAV" ? "Responsable SAV" : "Client")
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (user.IsBlocked)
+                                    {
+                                        <span class="badge bg-danger">Bloqué</span>
+                                    }
+                                    else if (!user.IsActive)
+                                    {
+                                        <span class="badge bg-warning text-dark">Désactivé</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">Actif</span>
+                                    }
+                                </td>
+                                <td>@user.CreatedAt.ToString("dd/MM/yyyy")</td>
+                                <td class="text-end">
+                                    <div class="btn-group" role="group">
+                                        <a href="/users/@user.Id" class="btn btn-sm btn-outline-info" title="Voir le profil">
+                                            <i data-feather="eye"></i>
+                                        </a>
+                                        @if (user.IsBlocked)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-success" @onclick="@(() => UnblockUser(user))" title="Débloquer">
+                                                <i data-feather="unlock"></i>
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-sm btn-warning" @onclick="@(() => BlockUser(user))" title="Bloquer">
+                                                <i data-feather="lock"></i>
+                                            </button>
+                                        }
+                                        
+                                        <button type="button" class="btn btn-sm btn-info" @onclick="@(() => ChangeRole(user))" title="Changer le rôle">
+                                            <i data-feather="user"></i>
+                                        </button>
+                                        
+                                        @if (user.IsActive)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-secondary" @onclick="@(() => DeactivateUser(user))" title="Désactiver">
+                                                <i data-feather="x-circle"></i>
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" class="btn btn-sm btn-success" @onclick="@(() => ActivateUser(user))" title="Activer">
+                                                <i data-feather="check-circle"></i>
+                                            </button>
+                                        }
+                                        
+                                        <button type="button" class="btn btn-sm btn-danger" @onclick="@(() => DeleteUser(user))" title="Supprimer">
+                                            <i data-feather="trash-2"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<UserDto> _users = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+
+    private async Task LoadUsers()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await AuthService.GetAllUsersAsync();
+            if (result.Success && result.Data != null)
+            {
+                _users = result.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task BlockUser(UserDto user)
+    {
+        var parameters = new DialogParameters<BlockUserDialog>
+        {
+            { x => x.UserId, user.Id },
+            { x => x.UserName, user.FullName }
+        };
+        
+        var dialog = await DialogService.ShowAsync<BlockUserDialog>("Bloquer l'utilisateur", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadUsers();
+        }
+    }
+
+    private async Task UnblockUser(UserDto user)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Débloquer l'utilisateur",
+            $"Êtes-vous sûr de vouloir débloquer {user.FullName}?",
+            yesText: "Oui", cancelText: "Non");
+
+        if (confirm == true)
+        {
+            var result = await AuthService.UnblockUserAsync(user.Id);
+            if (result.Success)
+            {
+                Snackbar.Add("Utilisateur débloqué avec succès", Severity.Success);
+                await LoadUsers();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors du déblocage", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ChangeRole(UserDto user)
+    {
+        var newRole = user.Role == "ResponsableSAV" ? "Client" : "ResponsableSAV";
+        var confirm = await DialogService.ShowMessageBox(
+            "Changer le rôle",
+            $"Changer le rôle de {user.FullName} en {(newRole == "ResponsableSAV" ? "Responsable SAV" : "Client")}?",
+            yesText: "Oui", cancelText: "Non");
+
+        if (confirm == true)
+        {
+            var result = await AuthService.ChangeUserRoleAsync(user.Id, newRole);
+            if (result.Success)
+            {
+                Snackbar.Add("Rôle modifié avec succès", Severity.Success);
+                await LoadUsers();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors du changement de rôle", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ActivateUser(UserDto user)
+    {
+        var result = await AuthService.ActivateUserAsync(user.Id);
+        if (result.Success)
+        {
+            Snackbar.Add("Utilisateur activé avec succès", Severity.Success);
+            await LoadUsers();
+        }
+        else
+        {
+            Snackbar.Add(result.Message ?? "Erreur lors de l'activation", Severity.Error);
+        }
+    }
+
+    private async Task DeactivateUser(UserDto user)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Désactiver l'utilisateur",
+            $"Êtes-vous sûr de vouloir désactiver {user.FullName}?",
+            yesText: "Oui", cancelText: "Non");
+
+        if (confirm == true)
+        {
+            var result = await AuthService.DeactivateUserAsync(user.Id);
+            if (result.Success)
+            {
+                Snackbar.Add("Utilisateur désactivé avec succès", Severity.Success);
+                await LoadUsers();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la désactivation", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteUser(UserDto user)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Supprimer l'utilisateur",
+            $"Êtes-vous sûr de vouloir supprimer {user.FullName}? Cette action est irréversible.",
+            yesText: "Oui, supprimer", cancelText: "Annuler");
+
+        if (confirm == true)
+        {
+            var result = await AuthService.DeleteUserAsync(user.Id);
+            if (result.Success)
+            {
+                Snackbar.Add("Utilisateur supprimé avec succès", Severity.Success);
+                await LoadUsers();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la suppression", Severity.Error);
+            }
+        }
+    }
+}
+

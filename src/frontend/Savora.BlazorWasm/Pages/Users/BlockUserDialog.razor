@@ -1,0 +1,46 @@
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Bloquer l'utilisateur</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_reason" Label="Raison du blocage (optionnel)" Variant="Variant.Outlined" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Block">Bloquer</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Guid UserId { get; set; }
+    [Parameter] public string UserName { get; set; } = string.Empty;
+    
+    [Inject] private IAuthService AuthService { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    
+    private string _reason = string.Empty;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Block()
+    {
+        var result = await AuthService.BlockUserAsync(UserId, string.IsNullOrWhiteSpace(_reason) ? null : _reason);
+        if (result.Success)
+        {
+            Snackbar.Add($"{UserName} a été bloqué avec succès", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add(result.Message ?? "Erreur lors du blocage", Severity.Error);
+        }
+    }
+}
+
+
+
+
+

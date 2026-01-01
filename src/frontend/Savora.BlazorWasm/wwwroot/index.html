@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>SAVORA - Smart After-Sales Service</title>
+    <base href="/" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- MudBlazor CSS -->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    
+    <!-- FullCalendar CSS -->
+    <link href="https://unpkg.com/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
+    
+    <!-- AdminKit CSS (Bootstrap 5 included) -->
+    <link href="adminkit/css/app.css" rel="stylesheet" />
+    
+    <!-- Custom CSS (Savora overrides - must be last) -->
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="css/custom.css" rel="stylesheet" />
+    <link href="css/calendar.css" rel="stylesheet" />
+    <link href="css/dark-mode.css" rel="stylesheet" />
+    <link href="Savora.BlazorWasm.styles.css" rel="stylesheet" />
+</head>
+<body>
+    <div id="app">
+        <div class="loading-container">
+            <div class="loading-content">
+                <svg class="loading-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#2563EB" stroke-width="4" stroke-dasharray="70 30">
+                        <animateTransform attributeName="transform" type="rotate" dur="1s" from="0 50 50" to="360 50 50" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="50" cy="50" r="35" fill="none" stroke="#06B6D4" stroke-width="3" stroke-dasharray="50 50">
+                        <animateTransform attributeName="transform" type="rotate" dur="1.5s" from="360 50 50" to="0 50 50" repeatCount="indefinite"/>
+                    </circle>
+                </svg>
+                <h1 class="loading-title">SAVORA</h1>
+                <p class="loading-subtitle">Smart After-Sales Service, Simplified.</p>
+                <div class="loading-progress">
+                    <div class="loading-progress-bar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" style="display: none;">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <strong>Une erreur s'est produite.</strong>
+                <a href="" class="reload ms-2">Recharger</a>
+            </div>
+            <a class="dismiss" style="cursor: pointer; font-size: 1.2rem;">🗙</a>
+        </div>
+    </div>
+    
+    <!-- FullCalendar JS -->
+    <script src="https://unpkg.com/fullcalendar@6.1.10/index.global.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- html2pdf for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <!-- AdminKit JS (includes Bootstrap 5 bundle) -->
+    <script src="adminkit/js/app.js"></script>
+    
+    <!-- Blazor WebAssembly -->
+    <script src="_framework/blazor.webassembly.js"></script>
+    
+    <!-- MudBlazor JS -->
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    
+    <!-- Theme JS -->
+    <script src="js/theme.js"></script>
+    
+    <!-- Custom Calendar JS -->
+    <script src="js/calendar.js"></script>
+    
+    <!-- Dashboard Charts JS -->
+    <script src="js/dashboard-charts.js"></script>
+    
+    <!-- Dashboard Export JS -->
+    <script src="js/dashboard-export.js"></script>
+    
+    <!-- Messages JS -->
+    <script src="js/messages.js"></script>
+    
+    <!-- Feather Icons initialization for AdminKit -->
+    <script>
+        // Re-initialize feather icons after Blazor navigation
+        window.initFeatherIcons = function() {
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+        };
+    </script>
+</body>
+</html>

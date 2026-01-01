@@ -1,0 +1,297 @@
+@page "/my-reclamations/new"
+@attribute [Authorize(Roles = "Client")]
+@inject IReclamationService ReclamationService
+@inject IArticleService ArticleService
+@inject IClientService ClientService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Nouvelle Réclamation</PageTitle>
+
+<div class="mb-3">
+    <a href="/my-reclamations" class="btn btn-link text-muted ps-0">
+        <i data-feather="arrow-left" class="me-2"></i> Retour à mes réclamations
+    </a>
+</div>
+
+<PageHeader Title="Créer une réclamation" Subtitle="Déclarez un problème avec votre article" Icon="alert-circle" />
+
+<!-- Progress Steps -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between position-relative" style="z-index: 1;">
+            <div class="progress position-absolute" style="height: 2px; top: 20px; left: 10%; right: 10%; z-index: 0;">
+                <div class="progress-bar bg-primary" style="width: @((_activeStep) * 50)%"></div>
+            </div>
+            <div class="text-center" style="z-index: 1;">
+                <div class="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2 @(_activeStep >= 0 ? "bg-primary text-white" : "bg-light text-muted")" style="width: 40px; height: 40px;">
+                    <i data-feather="package"></i>
+                </div>
+                <small class="@(_activeStep == 0 ? "fw-bold" : "text-muted")">Article</small>
+            </div>
+            <div class="text-center" style="z-index: 1;">
+                <div class="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2 @(_activeStep >= 1 ? "bg-primary text-white" : "bg-light text-muted")" style="width: 40px; height: 40px;">
+                    <i data-feather="file-text"></i>
+                </div>
+                <small class="@(_activeStep == 1 ? "fw-bold" : "text-muted")">Description</small>
+            </div>
+            <div class="text-center" style="z-index: 1;">
+                <div class="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2 @(_activeStep >= 2 ? "bg-primary text-white" : "bg-light text-muted")" style="width: 40px; height: 40px;">
+                    <i data-feather="check-circle"></i>
+                </div>
+                <small class="@(_activeStep == 2 ? "fw-bold" : "text-muted")">Confirmation</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step Content -->
+<div class="card mb-4">
+    <div class="card-body">
+        @if (_activeStep == 0)
+        {
+            <!-- Step 1: Select Article -->
+            <h5 class="card-title mb-4">Sélectionnez l'article concerné</h5>
+            
+            @if (_isLoadingArticles)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                </div>
+            }
+            else if (!_articles.Any())
+            {
+                <div class="alert alert-warning">
+                    <i data-feather="alert-triangle" class="me-2"></i>
+                    Vous n'avez aucun article enregistré. Veuillez contacter le service client.
+                </div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    @foreach (var article in _articles)
+                    {
+                        <div class="col-md-6">
+                            <div class="card h-100 @(article.Id == _selectedArticleId ? "border-primary" : "")" 
+                                 style="cursor: pointer; @(article.Id == _selectedArticleId ? "background-color: #EFF6FF;" : "")"
+                                 @onclick="@(() => _selectedArticleId = article.Id)">
+                                <div class="card-body">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="articleSelect" 
+                                               checked="@(article.Id == _selectedArticleId)" @onchange="@(() => _selectedArticleId = article.Id)" />
+                                        <label class="form-check-label w-100">
+                                            <h6 class="mb-1">@article.Name</h6>
+                                            <p class="text-muted mb-2">@article.Brand - @article.Reference</p>
+                                            @if (article.IsUnderWarranty)
+                                            {
+                                                <span class="badge bg-success"><i data-feather="check-circle" style="width: 12px; height: 12px;"></i> Sous garantie</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning text-dark"><i data-feather="alert-circle" style="width: 12px; height: 12px;"></i> Hors garantie</span>
+                                            }
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else if (_activeStep == 1)
+        {
+            <!-- Step 2: Description -->
+            <h5 class="card-title mb-4">Décrivez votre problème</h5>
+            
+            <div class="mb-4">
+                <label class="form-label">Titre de la réclamation <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" @bind="_model.Title" maxlength="200" 
+                       placeholder="Résumez brièvement le problème" />
+                <small class="text-muted">@(_model.Title?.Length ?? 0) / 200 caractères</small>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Description détaillée <span class="text-danger">*</span></label>
+                <textarea class="form-control" rows="6" @bind="_model.Description" maxlength="4000"
+                          placeholder="Décrivez le problème en détail : symptômes, circonstances, tentatives de résolution..."></textarea>
+                <small class="text-muted">@(_model.Description?.Length ?? 0) / 4000 caractères (minimum 20)</small>
+            </div>
+        }
+        else if (_activeStep == 2)
+        {
+            <!-- Step 3: Confirmation -->
+            <h5 class="card-title mb-4">Résumé de votre réclamation</h5>
+            
+            @if (_selectedArticle != null)
+            {
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <h6 class="text-muted mb-2">Article concerné</h6>
+                        <p class="mb-1"><strong>@_selectedArticle.Name</strong></p>
+                        <p class="text-muted mb-2">@_selectedArticle.Brand - @_selectedArticle.Reference</p>
+                        @if (_selectedArticle.IsUnderWarranty)
+                        {
+                            <span class="badge bg-success">Sous garantie - Intervention gratuite</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">Hors garantie - Intervention payante</span>
+                        }
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <h6 class="text-muted mb-2">Titre</h6>
+                        <p><strong>@_model.Title</strong></p>
+                    </div>
+                    <div class="col-12 mb-4">
+                        <h6 class="text-muted mb-2">Description</h6>
+                        <p style="white-space: pre-wrap;">@_model.Description</p>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <i data-feather="info" class="me-2"></i>
+                    Votre réclamation sera traitée dans les plus brefs délais. 
+                    Vous recevrez une notification à chaque mise à jour.
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Navigation Buttons -->
+<div class="d-flex justify-content-between">
+    <button type="button" class="btn btn-outline-secondary" @onclick="PreviousStep" disabled="@(_activeStep == 0)">
+        <i data-feather="chevron-left" class="me-1"></i> Précédent
+    </button>
+    
+    @if (_activeStep < 2)
+    {
+        <button type="button" class="btn btn-primary" @onclick="NextStep" disabled="@(!CanProceed())">
+            Suivant <i data-feather="chevron-right" class="ms-1"></i>
+        </button>
+    }
+    else
+    {
+        <button type="button" class="btn btn-success" @onclick="Submit" disabled="@(_isSubmitting || !CanSubmit())">
+            @if (_isSubmitting)
+            {
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            }
+            <i data-feather="check" class="me-1"></i> Soumettre ma réclamation
+        </button>
+    }
+</div>
+
+@code {
+    private int _activeStep = 0;
+    private CreateReclamationRequest _model = new();
+    private List<ArticleDto> _articles = new();
+    private Guid? _selectedArticleId;
+    private ArticleDto? _selectedArticle => _articles.FirstOrDefault(a => a.Id == _selectedArticleId);
+    private bool _isLoadingArticles = true;
+    private bool _isSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadArticles();
+    }
+
+    private async Task LoadArticles()
+    {
+        _isLoadingArticles = true;
+        try
+        {
+            var clientResult = await ClientService.GetCurrentClientAsync();
+            if (clientResult.Success && clientResult.Data != null)
+            {
+                var articlesResult = await ArticleService.GetByClientIdAsync(clientResult.Data.Id);
+                if (articlesResult.Success && articlesResult.Data != null)
+                {
+                    _articles = articlesResult.Data;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingArticles = false;
+        }
+    }
+
+    private void NextStep()
+    {
+        if (CanProceed())
+        {
+            _activeStep++;
+        }
+    }
+
+    private void PreviousStep()
+    {
+        if (_activeStep > 0)
+        {
+            _activeStep--;
+        }
+    }
+
+    private bool CanProceed()
+    {
+        return _activeStep switch
+        {
+            0 => _selectedArticleId.HasValue,
+            1 => !string.IsNullOrWhiteSpace(_model.Title) && _model.Title.Length >= 5 &&
+                 !string.IsNullOrWhiteSpace(_model.Description) && _model.Description.Length >= 20,
+            _ => true
+        };
+    }
+
+    private bool CanSubmit()
+    {
+        return _selectedArticleId.HasValue &&
+               !string.IsNullOrWhiteSpace(_model.Title) && _model.Title.Length >= 5 &&
+               !string.IsNullOrWhiteSpace(_model.Description) && _model.Description.Length >= 20;
+    }
+
+    private async Task Submit()
+    {
+        if (!CanSubmit()) return;
+
+        _isSubmitting = true;
+        try
+        {
+            _model.ClientArticleId = _selectedArticleId!.Value;
+            
+            var result = await ReclamationService.CreateAsync(_model);
+            
+            if (result.Success)
+            {
+                Snackbar.Add("Réclamation créée avec succès!", Severity.Success);
+                Navigation.NavigateTo($"/reclamations/{result.Data!.Id}");
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

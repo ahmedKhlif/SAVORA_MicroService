@@ -1,0 +1,69 @@
+@* 
+    NavMenu component - Kept for backward compatibility
+    The main navigation is now handled in MainLayout.razor using AdminKit sidebar
+*@
+@inject IAuthService AuthService
+
+<MudNavMenu>
+    <AuthorizeView>
+        <Authorized>
+            @if (context.User.IsInRole("Client"))
+            {
+                <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+                    Tableau de bord
+                </MudNavLink>
+                <MudNavLink Href="/my-reclamations" Icon="@Icons.Material.Filled.Report">
+                    Mes Réclamations
+                </MudNavLink>
+                <MudNavLink Href="/my-articles" Icon="@Icons.Material.Filled.Inventory2">
+                    Mes Articles
+                </MudNavLink>
+                <MudNavLink Href="/notifications" Icon="@Icons.Material.Filled.Notifications">
+                    Notifications
+                </MudNavLink>
+            }
+
+            @if (context.User.IsInRole("ResponsableSAV"))
+            {
+                <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+                    Dashboard
+                </MudNavLink>
+                
+                <MudNavGroup Title="Réclamations" Icon="@Icons.Material.Filled.Report" Expanded="false">
+                    <MudNavLink Href="/reclamations" Icon="@Icons.Material.Filled.List">
+                        Toutes les réclamations
+                    </MudNavLink>
+                </MudNavGroup>
+                
+                <MudNavGroup Title="Interventions" Icon="@Icons.Material.Filled.Build" Expanded="false">
+                    <MudNavLink Href="/interventions" Icon="@Icons.Material.Filled.List">
+                        Toutes les interventions
+                    </MudNavLink>
+                    <MudNavLink Href="/technicians" Icon="@Icons.Material.Filled.Engineering">
+                        Techniciens
+                    </MudNavLink>
+                </MudNavGroup>
+                
+                <MudNavGroup Title="Catalogue" Icon="@Icons.Material.Filled.Inventory" Expanded="false">
+                    <MudNavLink Href="/articles" Icon="@Icons.Material.Filled.Inventory2">
+                        Articles
+                    </MudNavLink>
+                    <MudNavLink Href="/parts" Icon="@Icons.Material.Filled.Hardware">
+                        Pièces détachées
+                    </MudNavLink>
+                </MudNavGroup>
+                
+                <MudNavLink Href="/clients" Icon="@Icons.Material.Filled.People">
+                    Clients
+                </MudNavLink>
+                
+                <MudNavLink Href="/invoices" Icon="@Icons.Material.Filled.Receipt">
+                    Factures
+                </MudNavLink>
+            }
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>
+
+@code {
+}

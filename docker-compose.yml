@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Databases
+  postgres:
+    image: postgres:15-alpine
+    container_name: savora-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_MULTIPLE_DATABASES: savora_auth,savora_articles,savora_reclamations,savora_interventions
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - savora-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./src
+      dockerfile: services/AuthService/Dockerfile
+    container_name: savora-auth-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=savora_auth;Username=postgres;Password=postgres
+      - JwtSettings__SecretKey=SavoraSecretKey2025VeryLongAndSecureKeyForJwtTokenGeneration!
+      - JwtSettings__Issuer=Savora.AuthService
+      - JwtSettings__Audience=Savora.WebApp
+    ports:
+      - "5001:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - savora-network
+
+  # Articles Service
+  articles-service:
+    build:
+      context: ./src
+      dockerfile: services/ArticlesService/Dockerfile
+    container_name: savora-articles-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=savora_articles;Username=postgres;Password=postgres
+      - JwtSettings__SecretKey=SavoraSecretKey2025VeryLongAndSecureKeyForJwtTokenGeneration!
+      - JwtSettings__Issuer=Savora.AuthService
+      - JwtSettings__Audience=Savora.WebApp
+    ports:
+      - "5002:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - savora-network
+
+  # Reclamations Service
+  reclamations-service:
+    build:
+      context: ./src
+      dockerfile: services/ReclamationsService/Dockerfile
+    container_name: savora-reclamations-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=savora_reclamations;Username=postgres;Password=postgres
+      - JwtSettings__SecretKey=SavoraSecretKey2025VeryLongAndSecureKeyForJwtTokenGeneration!
+      - JwtSettings__Issuer=Savora.AuthService
+      - JwtSettings__Audience=Savora.WebApp
+    ports:
+      - "5003:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - savora-network
+
+  # Interventions Service
+  interventions-service:
+    build:
+      context: ./src
+      dockerfile: services/InterventionsService/Dockerfile
+    container_name: savora-interventions-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=savora_interventions;Username=postgres;Password=postgres
+      - JwtSettings__SecretKey=SavoraSecretKey2025VeryLongAndSecureKeyForJwtTokenGeneration!
+      - JwtSettings__Issuer=Savora.AuthService
+      - JwtSettings__Audience=Savora.WebApp
+    ports:
+      - "5004:80"
+    volumes:
+      - invoices_data:/app/uploads/invoices
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - savora-network
+
+  # Blazor WebAssembly Frontend
+  frontend:
+    build:
+      context: ./src
+      dockerfile: frontend/Savora.BlazorWasm/Dockerfile
+    container_name: savora-frontend
+    ports:
+      - "5000:80"
+    depends_on:
+      - auth-service
+      - articles-service
+      - reclamations-service
+      - interventions-service
+    networks:
+      - savora-network
+
+volumes:
+  postgres_data:
+  invoices_data:
+
+networks:
+  savora-network:
+    driver: bridge
+

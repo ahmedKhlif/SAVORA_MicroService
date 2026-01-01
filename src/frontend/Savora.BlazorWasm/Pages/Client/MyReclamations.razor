@@ -1,0 +1,199 @@
+@page "/my-reclamations"
+@attribute [Authorize(Roles = "Client")]
+@inject IReclamationService ReclamationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Mes Réclamations</PageTitle>
+
+<PageHeader Title="Mes Réclamations" Subtitle="Consultez et gérez vos réclamations" Icon="alert-circle">
+    <a href="/my-reclamations/new" class="btn btn-primary">
+        <i data-feather="plus" class="me-2"></i> Nouvelle réclamation
+    </a>
+</PageHeader>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else if (!_reclamations.Any())
+{
+    <div class="card">
+        <div class="card-body empty-state">
+            <i data-feather="inbox" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+            <h5 class="mt-3">Aucune réclamation</h5>
+            <p>Vous n'avez pas encore créé de réclamation.</p>
+            <a href="/my-reclamations/new" class="btn btn-primary mt-3">
+                <i data-feather="plus" class="me-2"></i> Créer ma première réclamation
+            </a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var reclamation in _reclamations)
+        {
+            <div class="col-12">
+                <div class="card hover-lift" style="cursor: pointer;" @onclick="@(() => ViewReclamation(reclamation.Id))">
+                    <div class="card-body">
+                        <div class="row align-items-start">
+                            <div class="col">
+                                <h5 class="card-title mb-1">@reclamation.Title</h5>
+                                <p class="text-muted small mb-2">
+                                    <i data-feather="package" class="me-1" style="width: 14px; height: 14px;"></i>
+                                    @reclamation.ArticleName
+                                </p>
+                                <p class="text-muted small mb-0">
+                                    <i data-feather="calendar" class="me-1" style="width: 14px; height: 14px;"></i>
+                                    Créée le @reclamation.CreatedAt.ToString("dd/MM/yyyy à HH:mm")
+                                </p>
+                            </div>
+                            <div class="col-auto text-end">
+                                <div class="mb-2">
+                                    <span class="badge @GetPriorityBadgeClass(reclamation.Priority) me-1">
+                                        @GetPriorityLabel(reclamation.Priority)
+                                    </span>
+                                    <span class="badge @GetStatusBadgeClass(reclamation.Status)">
+                                        @GetStatusLabel(reclamation.Status)
+                                    </span>
+                                </div>
+                                @if (reclamation.IsUnderWarranty)
+                                {
+                                    <span class="badge bg-success">
+                                        <i data-feather="check-circle" class="me-1" style="width: 12px; height: 12px;"></i> Sous garantie
+                                    </span>
+                                }
+                                <div class="mt-2">
+                                    <span class="badge @GetSlaBadgeClass(reclamation.SlaStatus)">
+                                        @GetSlaLabel(reclamation.SlaStatus)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        @if (reclamation.AttachmentCount > 0 || reclamation.InterventionCount > 0)
+                        {
+                            <hr class="my-3" />
+                            <div class="d-flex gap-3">
+                                @if (reclamation.AttachmentCount > 0)
+                                {
+                                    <span class="text-muted small">
+                                        <i data-feather="paperclip" class="me-1" style="width: 14px; height: 14px;"></i>
+                                        @reclamation.AttachmentCount pièce(s) jointe(s)
+                                    </span>
+                                }
+                                @if (reclamation.InterventionCount > 0)
+                                {
+                                    <span class="text-muted small">
+                                        <i data-feather="tool" class="me-1" style="width: 14px; height: 14px;"></i>
+                                        @reclamation.InterventionCount intervention(s)
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<ReclamationListDto> _reclamations = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReclamations();
+    }
+
+    private async Task LoadReclamations()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await ReclamationService.GetMyReclamationsAsync();
+            if (result.Success && result.Data != null)
+            {
+                _reclamations = result.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ViewReclamation(Guid id)
+    {
+        Navigation.NavigateTo($"/reclamations/{id}");
+    }
+
+    private string GetPriorityBadgeClass(Priority priority) => priority switch
+    {
+        Priority.Urgent => "bg-danger",
+        Priority.High => "bg-warning text-dark",
+        Priority.Medium => "bg-info",
+        _ => "bg-success"
+    };
+
+    private string GetPriorityLabel(Priority priority) => priority switch
+    {
+        Priority.Urgent => "Urgente",
+        Priority.High => "Haute",
+        Priority.Medium => "Moyenne",
+        Priority.Low => "Basse",
+        _ => priority.ToString()
+    };
+
+    private string GetStatusBadgeClass(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "bg-primary",
+        ReclamationStatus.InProgress => "bg-warning text-dark",
+        ReclamationStatus.Closed => "bg-success",
+        ReclamationStatus.Cancelled => "bg-secondary",
+        _ => "bg-info"
+    };
+
+    private string GetStatusLabel(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "Nouvelle",
+        ReclamationStatus.InProgress => "En cours",
+        ReclamationStatus.PendingIntervention => "Attente intervention",
+        ReclamationStatus.InterventionScheduled => "Intervention planifiée",
+        ReclamationStatus.UnderIntervention => "En intervention",
+        ReclamationStatus.PendingInvoice => "Attente facture",
+        ReclamationStatus.Closed => "Clôturée",
+        ReclamationStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    private string GetSlaBadgeClass(string slaStatus) => slaStatus switch
+    {
+        "Overdue" => "bg-danger",
+        "NearDeadline" => "bg-warning text-dark",
+        _ => "bg-success"
+    };
+
+    private string GetSlaLabel(string slaStatus) => slaStatus switch
+    {
+        "Overdue" => "En retard",
+        "NearDeadline" => "Proche",
+        _ => "À temps"
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

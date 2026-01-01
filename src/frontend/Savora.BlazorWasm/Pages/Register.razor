@@ -1,0 +1,214 @@
+@page "/register"
+@layout EmptyLayout
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+
+<main class="d-flex w-100 h-100">
+    <div class="container d-flex flex-column">
+        <div class="row vh-100">
+            <div class="col-sm-10 col-md-8 col-lg-6 col-xl-5 mx-auto d-table h-100">
+                <div class="d-table-cell align-middle">
+
+                    <div class="text-center mt-4">
+                        <img src="img/logo.png" alt="SAVORA" height="64" class="mb-3" />
+                        <h1 class="h2 savora-logo">SAVORA</h1>
+                        <p class="lead text-muted">
+                            Smart After-Sales Service, Simplified.
+                        </p>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="m-sm-3">
+                                @if (_registrationSuccess)
+                                {
+                                    <div class="text-center py-4">
+                                        <div class="mb-4">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="#10B981" viewBox="0 0 16 16">
+                                                <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/>
+                                            </svg>
+                                        </div>
+                                        <h3 class="text-success mb-3">Vérifiez votre email!</h3>
+                                        <p class="text-muted mb-2">
+                                            Un email de vérification a été envoyé à:
+                                        </p>
+                                        <p class="fw-bold mb-4">@_registeredEmail</p>
+                                        <p class="text-muted small mb-4">
+                                            Cliquez sur le lien dans l'email pour activer votre compte.
+                                            N'oubliez pas de vérifier votre dossier spam.
+                                        </p>
+                                        <div class="d-grid gap-2">
+                                            <a href="/login" class="btn btn-primary">
+                                                Aller à la connexion
+                                            </a>
+                                            <button type="button" class="btn btn-outline-secondary" @onclick="ResendVerificationEmail">
+                                                Renvoyer l'email
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                <h4 class="mb-4">Créer un compte</h4>
+                                
+                                <EditForm Model="@_model" OnValidSubmit="HandleRegister">
+                                    <DataAnnotationsValidator />
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Nom complet</label>
+                                        <InputText @bind-Value="_model.FullName" 
+                                                   class="form-control form-control-lg" 
+                                                   placeholder="Entrez votre nom complet" />
+                                        <ValidationMessage For="@(() => _model.FullName)" class="text-danger small" />
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Email</label>
+                                        <InputText @bind-Value="_model.Email" 
+                                                   type="email"
+                                                   class="form-control form-control-lg" 
+                                                   placeholder="Entrez votre email" />
+                                        <ValidationMessage For="@(() => _model.Email)" class="text-danger small" />
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Téléphone</label>
+                                        <InputText @bind-Value="_model.Phone" 
+                                                   class="form-control form-control-lg" 
+                                                   placeholder="Entrez votre téléphone" />
+                                        <ValidationMessage For="@(() => _model.Phone)" class="text-danger small" />
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Adresse (optionnel)</label>
+                                            <InputText @bind-Value="_model.Address" 
+                                                       class="form-control" 
+                                                       placeholder="Adresse" />
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Ville (optionnel)</label>
+                                            <InputText @bind-Value="_model.City" 
+                                                       class="form-control" 
+                                                       placeholder="Ville" />
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Mot de passe</label>
+                                        <InputText @bind-Value="_model.Password" 
+                                                   type="@(_showPassword ? "text" : "password")"
+                                                   class="form-control form-control-lg" 
+                                                   placeholder="Entrez votre mot de passe" />
+                                        <ValidationMessage For="@(() => _model.Password)" class="text-danger small" />
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Confirmer le mot de passe</label>
+                                        <InputText @bind-Value="_model.ConfirmPassword" 
+                                                   type="@(_showPassword ? "text" : "password")"
+                                                   class="form-control form-control-lg" 
+                                                   placeholder="Confirmez votre mot de passe" />
+                                        <ValidationMessage For="@(() => _model.ConfirmPassword)" class="text-danger small" />
+                                    </div>
+
+                                    <div class="form-check mb-3">
+                                        <input type="checkbox" class="form-check-input" @onchange="@(() => _showPassword = !_showPassword)" />
+                                        <label class="form-check-label">Afficher les mots de passe</label>
+                                    </div>
+
+                                    <div class="d-grid gap-2 mt-4">
+                                        <button type="submit" class="btn btn-lg btn-primary" disabled="@_isLoading">
+                                            @if (_isLoading)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                <span>Inscription...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>S'inscrire</span>
+                                            }
+                                        </button>
+                                    </div>
+                                </EditForm>
+
+                                <hr class="my-4" />
+
+                                <div class="text-center">
+                                    <p class="mb-0">
+                                        Déjà un compte ?
+                                        <a href="/login" class="text-primary">Se connecter</a>
+                                    </p>
+                                </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+@code {
+    private RegisterRequest _model = new();
+    private bool _isLoading = false;
+    private bool _showPassword = false;
+    private bool _registrationSuccess = false;
+    private string _registeredEmail = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialize Feather icons after first render
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+    }
+
+    private async Task HandleRegister()
+    {
+        _isLoading = true;
+        
+        try
+        {
+            var result = await AuthService.RegisterAsync(_model);
+            
+            if (result.Success)
+            {
+                _registrationSuccess = true;
+                _registeredEmail = _model.Email;
+                Snackbar.Add("Inscription réussie! Vérifiez votre email.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de l'inscription", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ResendVerificationEmail()
+    {
+        try
+        {
+            await AuthService.ResendVerificationEmailAsync(_registeredEmail);
+            Snackbar.Add("Email de vérification renvoyé!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+    }
+}

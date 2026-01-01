@@ -1,0 +1,20 @@
+@page "/"
+@attribute [Authorize]
+@inject IDashboardService DashboardService
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>SAVORA - Dashboard</PageTitle>
+
+<AuthorizeView Roles="Client">
+    <Authorized>
+        <ClientDashboard />
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Roles="ResponsableSAV">
+    <Authorized>
+        <SavDashboard />
+    </Authorized>
+</AuthorizeView>
+

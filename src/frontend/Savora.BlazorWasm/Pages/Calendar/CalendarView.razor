@@ -1,0 +1,489 @@
+@page "/calendar"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@implements IDisposable
+@using MudBlazor
+@inject IInterventionService InterventionService
+@inject IReclamationService ReclamationService
+@inject ITechnicianService TechnicianService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Calendrier</PageTitle>
+
+<PageHeader Title="Calendrier des interventions" Subtitle="Vue complète de toutes les interventions planifiées" Icon="calendar">
+    <button type="button" class="btn btn-outline-primary" @onclick="RefreshCalendar">
+        <i data-feather="refresh-cw" class="me-1"></i> Actualiser
+    </button>
+    <button type="button" class="btn btn-primary" @onclick="CreateNewIntervention">
+        <i data-feather="plus" class="me-1"></i> Nouvelle intervention
+    </button>
+</PageHeader>
+
+<!-- Stats Cards -->
+<div class="calendar-stats">
+    <div class="calendar-stat-card">
+        <div class="calendar-stat-icon today">
+            <i data-feather="calendar" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="calendar-stat-content">
+            <h3>@_todayCount</h3>
+            <p>Aujourd'hui</p>
+        </div>
+    </div>
+    <div class="calendar-stat-card">
+        <div class="calendar-stat-icon week">
+            <i data-feather="clock" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="calendar-stat-content">
+            <h3>@_weekCount</h3>
+            <p>Cette semaine</p>
+        </div>
+    </div>
+    <div class="calendar-stat-card">
+        <div class="calendar-stat-icon pending">
+            <i data-feather="alert-circle" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="calendar-stat-content">
+            <h3>@_pendingCount</h3>
+            <p>En attente</p>
+        </div>
+    </div>
+    <div class="calendar-stat-card">
+        <div class="calendar-stat-icon overdue">
+            <i data-feather="alert-triangle" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="calendar-stat-content">
+            <h3>@_overdueCount</h3>
+            <p>En retard</p>
+        </div>
+    </div>
+</div>
+
+<!-- Legend -->
+<div class="calendar-legend">
+    <div class="calendar-legend-item">
+        <div class="calendar-legend-dot planned"></div>
+        <span>Planifiée</span>
+    </div>
+    <div class="calendar-legend-item">
+        <div class="calendar-legend-dot inprogress"></div>
+        <span>En cours</span>
+    </div>
+    <div class="calendar-legend-item">
+        <div class="calendar-legend-dot completed"></div>
+        <span>Terminée</span>
+    </div>
+    <div class="calendar-legend-item">
+        <div class="calendar-legend-dot cancelled"></div>
+        <span>Annulée</span>
+    </div>
+    <div class="calendar-legend-item ms-3">
+        <span>🎁</span>
+        <span>Gratuite (sous garantie)</span>
+    </div>
+    <div class="calendar-legend-item ms-3">
+        <i data-feather="move" style="width: 16px; height: 16px; color: #64748B;"></i>
+        <span class="text-muted small">Glissez-déposez pour reprogrammer</span>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Technicien</label>
+                <select class="form-select" @bind="_selectedTechnician" @bind:after="ApplyFilters">
+                    <option value="">Tous les techniciens</option>
+                    @foreach (var tech in _technicians)
+                    {
+                        <option value="@tech.Id">@tech.FullName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Statut</label>
+                <select class="form-select" @bind="_selectedStatus" @bind:after="ApplyFilters">
+                    <option value="">Tous les statuts</option>
+                    <option value="Planned">Planifiée</option>
+                    <option value="InProgress">En cours</option>
+                    <option value="Completed">Terminée</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Type</label>
+                <select class="form-select" @bind="_selectedType" @bind:after="ApplyFilters">
+                    <option value="">Tous</option>
+                    <option value="free">Gratuites</option>
+                    <option value="paid">Payantes</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+                    <i data-feather="x" class="me-1"></i> Effacer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Calendar Container -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="savora-calendar-container">
+            <div id="calendar-loader">
+                <div class="calendar-loader-spinner"></div>
+            </div>
+            
+            @if (_isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                    <p class="text-muted mt-3">Chargement du calendrier...</p>
+                </div>
+            }
+            else
+            {
+                <div id="savora-calendar" style="padding: 1rem;"></div>
+            }
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private List<InterventionListDto> _interventions = new();
+    private List<TechnicianDto> _technicians = new();
+    private bool _isLoading = true;
+    private bool _calendarInitialized = false;
+    private DotNetObjectReference<CalendarView>? _dotNetRef;
+    
+    // Stats
+    private int _todayCount = 0;
+    private int _weekCount = 0;
+    private int _pendingCount = 0;
+    private int _overdueCount = 0;
+    
+    // Filters
+    private string _selectedTechnician = "";
+    private string _selectedStatus = "";
+    private string _selectedType = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTechnicians();
+        await LoadInterventions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+        
+        if (!_isLoading && !_calendarInitialized)
+        {
+            await InitializeCalendar();
+        }
+    }
+
+    private async Task LoadTechnicians()
+    {
+        try
+        {
+            var result = await TechnicianService.GetAllAsync(1, 100);
+            if (result.Success && result.Data != null)
+            {
+                _technicians = result.Data.Items;
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadInterventions()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await InterventionService.GetAllAsync(1, 500);
+            if (result.Success && result.Data != null)
+            {
+                _interventions = result.Data.Items;
+                CalculateStats();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void CalculateStats()
+    {
+        var today = DateTime.Today;
+        var weekEnd = today.AddDays(7);
+        
+        _todayCount = _interventions.Count(i => i.PlannedDate.Date == today);
+        _weekCount = _interventions.Count(i => i.PlannedDate.Date >= today && i.PlannedDate.Date <= weekEnd);
+        _pendingCount = _interventions.Count(i => i.Status == InterventionStatus.Planned);
+        _overdueCount = _interventions.Count(i => 
+            i.Status == InterventionStatus.Planned && 
+            i.PlannedDate < DateTime.Now);
+    }
+
+    private async Task InitializeCalendar()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+        
+        var events = GetFilteredEvents();
+        
+        try
+        {
+            // Enable drag & drop for interventions calendar (can reschedule)
+            var options = new { editable = true, selectable = true };
+            await JSRuntime.InvokeVoidAsync("initSavoraCalendar", "savora-calendar", events, _dotNetRef, options);
+            _calendarInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Calendar init error: {ex.Message}");
+        }
+    }
+
+    private List<object> GetFilteredEvents()
+    {
+        var filtered = _interventions.AsEnumerable();
+        
+        if (!string.IsNullOrEmpty(_selectedTechnician) && Guid.TryParse(_selectedTechnician, out var techId))
+        {
+            filtered = filtered.Where(i => i.TechnicianId == techId);
+        }
+        
+        if (!string.IsNullOrEmpty(_selectedStatus) && Enum.TryParse<InterventionStatus>(_selectedStatus, out var status))
+        {
+            filtered = filtered.Where(i => i.Status == status);
+        }
+        
+        if (_selectedType == "free")
+        {
+            filtered = filtered.Where(i => i.IsFree);
+        }
+        else if (_selectedType == "paid")
+        {
+            filtered = filtered.Where(i => !i.IsFree);
+        }
+
+        return filtered.Select(i => new
+        {
+            id = i.Id.ToString(),
+            title = $"{(i.IsFree ? "🎁 " : "")}{i.ReclamationTitle}",
+            start = i.PlannedDate.ToString("yyyy-MM-ddTHH:mm:ss"),
+            end = i.PlannedDate.AddHours(2).ToString("yyyy-MM-ddTHH:mm:ss"),
+            backgroundColor = GetEventColor(i.Status),
+            borderColor = GetEventColor(i.Status),
+            textColor = "#ffffff",
+            className = GetEventClasses(i),
+            extendedProps = new
+            {
+                clientName = i.ClientName,
+                technicianName = i.TechnicianName ?? "Non assigné",
+                status = i.Status.ToString(),
+                isFree = i.IsFree,
+                totalAmount = i.TotalAmount
+            }
+        }).Cast<object>().ToList();
+    }
+
+    private string GetEventColor(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "#3B82F6",
+        InterventionStatus.InProgress => "#F59E0B",
+        InterventionStatus.Completed => "#10B981",
+        InterventionStatus.Cancelled => "#6B7280",
+        _ => "#3B82F6"
+    };
+
+    private string GetEventClasses(InterventionListDto intervention)
+    {
+        var classes = new List<string>();
+        
+        classes.Add($"event-{intervention.Status.ToString().ToLower()}");
+        
+        if (intervention.IsFree)
+        {
+            classes.Add("event-free");
+        }
+        
+        return string.Join(" ", classes);
+    }
+
+    private async Task ApplyFilters()
+    {
+        if (_calendarInitialized)
+        {
+            var events = GetFilteredEvents();
+            await JSRuntime.InvokeVoidAsync("updateCalendarEvents", events);
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        _selectedTechnician = "";
+        _selectedStatus = "";
+        _selectedType = "";
+        await ApplyFilters();
+    }
+
+    private async Task RefreshCalendar()
+    {
+        _calendarInitialized = false;
+        await LoadInterventions();
+        StateHasChanged();
+        await Task.Delay(100);
+        await InitializeCalendar();
+        Snackbar.Add("Calendrier actualisé", Severity.Success);
+    }
+
+    private void CreateNewIntervention()
+    {
+        Navigation.NavigateTo("/interventions/new");
+    }
+
+    [JSInvokable]
+    public async Task OnEventClick(string eventId)
+    {
+        if (Guid.TryParse(eventId, out var id))
+        {
+            var intervention = _interventions.FirstOrDefault(i => i.Id == id);
+            if (intervention != null)
+            {
+                await ShowInterventionDialog(intervention);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void OnDateClick(string dateStr)
+    {
+        Snackbar.Add($"Date sélectionnée: {dateStr}", Severity.Info);
+    }
+
+    [JSInvokable]
+    public async Task OnEventDrop(string eventId, string newDateStr)
+    {
+        if (Guid.TryParse(eventId, out var id))
+        {
+            var intervention = _interventions.FirstOrDefault(i => i.Id == id);
+            if (intervention != null)
+            {
+                try
+                {
+                    var oldDate = intervention.PlannedDate;
+                    var newDate = DateTime.Parse(newDateStr);
+                    
+                    // Validate new date is not in the past
+                    if (newDate < DateTime.Now.AddMinutes(-30))
+                    {
+                        Snackbar.Add("❌ Impossible de programmer une intervention dans le passé", Severity.Warning);
+                        // Refresh calendar to revert to original position
+                        await RefreshCalendar();
+                        return;
+                    }
+                    
+                    var result = await InterventionService.RescheduleAsync(id, newDate, null);
+                    
+                    if (result.Success)
+                    {
+                        intervention.PlannedDate = newDate;
+                        Snackbar.Add($"✅ Intervention reprogrammée du {oldDate:dd/MM/yyyy HH:mm} au {newDate:dd/MM/yyyy HH:mm}", Severity.Success);
+                        CalculateStats();
+                        StateHasChanged();
+                    }
+                    else
+                    {
+                        Snackbar.Add($"❌ Erreur: {result.Message}", Severity.Error);
+                        // Refresh calendar to revert to original position
+                        await RefreshCalendar();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"❌ Erreur: {ex.Message}", Severity.Error);
+                    // Refresh calendar to revert to original position
+                    await RefreshCalendar();
+                }
+            }
+        }
+    }
+    
+    [JSInvokable]
+    public Task OnEventResize(string eventId, string newStartStr, string newEndStr)
+    {
+        // Optional: Handle event duration changes
+        Snackbar.Add("ℹ️ Modification de la durée non disponible pour le moment", Severity.Info);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public void OnDateRangeSelect(string startStr, string endStr)
+    {
+        Snackbar.Add($"Période sélectionnée: {startStr} - {endStr}", Severity.Info);
+    }
+
+    private async Task ShowInterventionDialog(InterventionListDto intervention)
+    {
+        var parameters = new DialogParameters<InterventionDetailDialog>
+        {
+            { x => x.Intervention, intervention }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            DisableBackdropClick = false
+        };
+
+        var dialog = await DialogService.ShowAsync<InterventionDetailDialog>("", parameters, options);
+        await dialog.Result;
+    }
+
+    private string GetStatusBadgeClass(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "bg-primary",
+        InterventionStatus.InProgress => "bg-warning text-dark",
+        InterventionStatus.Completed => "bg-success",
+        InterventionStatus.Cancelled => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusLabel(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "Planifiée",
+        InterventionStatus.InProgress => "En cours",
+        InterventionStatus.Completed => "Terminée",
+        InterventionStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+        try
+        {
+            JSRuntime.InvokeVoidAsync("destroySavoraCalendar");
+        }
+        catch { }
+    }
+}
+

@@ -1,0 +1,294 @@
+@using Savora.Shared.DTOs.Articles
+@using Savora.Shared.DTOs.Reclamations
+@inject IArticleService ArticleService
+@inject IClientService ClientService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_model.Reference" Label="Référence" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" 
+                      HelperText="@_suggestedReference" />
+        
+        <MudTextField @bind-Value="_model.Name" Label="Nom" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" />
+        
+        <MudTextField @bind-Value="_model.Brand" Label="Marque" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" />
+        
+        <MudTextField @bind-Value="_model.Category" Label="Catégorie" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" />
+        
+        <MudTextField @bind-Value="_model.SerialNumber" Label="Numéro de série" Variant="Variant.Outlined"
+                      FullWidth="true" Class="mb-3" Required="true" />
+        
+        <MudDatePicker @bind-Date="_purchaseDate" Label="Date d'achat" Variant="Variant.Outlined"
+                       FullWidth="true" Class="mb-3" Required="true" DateFormat="dd/MM/yyyy" />
+        
+        <MudNumericField T="int" @bind-Value="_model.WarrantyMonths" Label="Durée de garantie (mois)" Variant="Variant.Outlined"
+                         FullWidth="true" Class="mb-3" Min="0" Required="true" />
+
+        <MudNumericField T="decimal" @bind-Value="_model.Price" Label="Prix d'achat (TND)" Variant="Variant.Outlined"
+                         FullWidth="true" Class="mb-3" Min="@((decimal)0.01)" Required="true" />
+
+        <MudAutocomplete T="ClientDto" @bind-Value="_selectedClient" Label="Client" Variant="Variant.Outlined"
+                        FullWidth="true" Class="mb-3" Required="true"
+                        SearchFunc="@SearchClients"
+                        ToStringFunc="@(client => client?.FullName ?? string.Empty)"
+                        MaxItems="10"
+                        ResetValueOnEmptyText="true"
+                        CoerceText="true"
+                        CoerceValue="false" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" 
+                   Disabled="@(_isLoading || _selectedClient == null || _selectedClient.Id == Guid.Empty || _model.Price <= 0)">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Enregistrer
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public ArticleDto? Article { get; set; }
+
+    private CreateArticleRequest _model = new() { WarrantyMonths = 24, Price = 0 };
+    private DateTime? _purchaseDate = DateTime.Today;
+    private ClientDto? _selectedClient = null;
+    private List<ClientDto> _clients = new();
+    private bool _isLoading = false;
+    private bool _isEdit => Article != null;
+    private string _suggestedReference = string.Empty;
+
+    protected override Task OnInitializedAsync()
+    {
+        try
+        {
+            if (Article != null)
+            {
+                _model.Reference = Article.Reference;
+                _model.Name = Article.Name;
+                _model.Brand = Article.Brand;
+                _model.Category = Article.Category;
+                _model.SerialNumber = Article.SerialNumber;
+                _model.WarrantyMonths = Article.WarrantyMonths;
+                _model.Price = Article.Price;
+                _purchaseDate = Article.PurchaseDate;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors de l'initialisation: {ex.Message}", Severity.Error);
+        }
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await LoadClients();
+                
+                if (!_isEdit)
+                {
+                    await LoadSuggestedReference();
+                }
+                
+                if (Article != null && Article.ClientId != Guid.Empty)
+                {
+                    _selectedClient = _clients.FirstOrDefault(c => c.Id == Article.ClientId);
+                    StateHasChanged();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erreur lors du chargement des données: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task LoadClients()
+    {
+        try
+        {
+            var result = await ClientService.GetAllAsync(1, 1000);
+            if (result.Success && result.Data != null)
+            {
+                _clients = result.Data.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors du chargement des clients: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadSuggestedReference()
+    {
+        try
+        {
+            var result = await ArticleService.GetAllAsync(1, 1000);
+            if (result.Success && result.Data != null && result.Data.Items != null && result.Data.Items.Any())
+            {
+                var lastArticle = result.Data.Items
+                    .Where(a => !string.IsNullOrEmpty(a.Reference))
+                    .OrderByDescending(a => a.Reference)
+                    .FirstOrDefault();
+                
+                if (lastArticle != null && !string.IsNullOrEmpty(lastArticle.Reference))
+                {
+                    var suggestedRef = GenerateNextReference(lastArticle.Reference);
+                    _suggestedReference = $"Suggestion: {suggestedRef}";
+                    _model.Reference = suggestedRef;
+                }
+                else
+                {
+                    _suggestedReference = "Suggestion: ART-001";
+                    _model.Reference = "ART-001";
+                }
+            }
+            else
+            {
+                _suggestedReference = "Suggestion: ART-001";
+                _model.Reference = "ART-001";
+            }
+        }
+        catch
+        {
+            // Silently fail and use default reference
+            _suggestedReference = "Suggestion: ART-001";
+            _model.Reference = "ART-001";
+        }
+    }
+
+    private string GenerateNextReference(string lastReference)
+    {
+        if (string.IsNullOrEmpty(lastReference))
+            return "ART-001";
+
+        // Extract number from reference (e.g., "ART-001" -> 1, "ART-123" -> 123)
+        var match = System.Text.RegularExpressions.Regex.Match(lastReference, @"(\d+)$");
+        if (match.Success && int.TryParse(match.Value, out var number))
+        {
+            var prefix = lastReference.Substring(0, lastReference.Length - match.Value.Length);
+            var nextNumber = number + 1;
+            return $"{prefix}{nextNumber:D3}";
+        }
+
+        // If no number found, try to extract and increment
+        var parts = lastReference.Split('-');
+        if (parts.Length > 1 && int.TryParse(parts.Last(), out var num))
+        {
+            var prefix = string.Join("-", parts.Take(parts.Length - 1));
+            return $"{prefix}-{(num + 1):D3}";
+        }
+
+        return "ART-001";
+    }
+
+    private Task<IEnumerable<ClientDto>> SearchClients(string value)
+    {
+        try
+        {
+            if (_clients == null || !_clients.Any())
+                return Task.FromResult<IEnumerable<ClientDto>>(new List<ClientDto>());
+
+            if (string.IsNullOrWhiteSpace(value))
+                return Task.FromResult<IEnumerable<ClientDto>>(_clients.Take(10));
+
+            var searchTerm = value.ToLower();
+            return Task.FromResult(_clients
+                .Where(c => (c.FullName?.ToLower().Contains(searchTerm) ?? false) || 
+                           (c.Email?.ToLower().Contains(searchTerm) ?? false))
+                .Take(10));
+        }
+        catch
+        {
+            return Task.FromResult<IEnumerable<ClientDto>>(new List<ClientDto>());
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (_selectedClient == null || _selectedClient.Id == Guid.Empty)
+        {
+            Snackbar.Add("Veuillez sélectionner un client", Severity.Warning);
+            return;
+        }
+
+        if (_model.Price <= 0)
+        {
+            Snackbar.Add("Le prix doit être supérieur à 0", Severity.Warning);
+            return;
+        }
+
+        _isLoading = true;
+        try
+        {
+            _model.PurchaseDate = _purchaseDate!.Value;
+            _model.ClientId = _selectedClient.Id;
+            
+            if (_isEdit)
+            {
+                if (_selectedClient == null || _selectedClient.Id == Guid.Empty)
+                {
+                    Snackbar.Add("Veuillez sélectionner un client", Severity.Warning);
+                    _isLoading = false;
+                    return;
+                }
+
+                var updateRequest = new UpdateArticleRequest
+                {
+                    Reference = _model.Reference,
+                    Name = _model.Name,
+                    Brand = _model.Brand,
+                    Category = _model.Category,
+                    SerialNumber = _model.SerialNumber,
+                    PurchaseDate = _model.PurchaseDate,
+                    WarrantyMonths = _model.WarrantyMonths,
+                    Price = _model.Price,
+                    ClientId = _selectedClient.Id
+                };
+                var result = await ArticleService.UpdateAsync(Article!.Id, updateRequest);
+                if (result.Success)
+                {
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result.Message ?? "Erreur lors de la modification de l'article", Severity.Error);
+                }
+            }
+            else
+            {
+                var result = await ArticleService.CreateAsync(_model);
+                if (result.Success)
+                {
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result.Message ?? "Erreur lors de la création de l'article", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

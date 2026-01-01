@@ -1,0 +1,201 @@
+@using MudBlazor
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true" Class="reclamation-detail-dialog">
+    <TitleContent>
+        <div class="d-flex align-items-center reclamation-dialog-header">
+            <div class="calendar-icon-wrapper me-3">
+                <i data-feather="alert-circle" style="width: 24px; height: 24px; color: white;"></i>
+            </div>
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.h6" Class="mb-0 fw-bold text-white">Détails de la réclamation</MudText>
+                <MudText Typo="Typo.body2" Class="text-white-50 mb-0">Réclamation #@Reclamation.Id.ToString().Substring(0, 8)</MudText>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <!-- Titre -->
+        <div class="mb-4">
+            <div class="d-flex align-items-center mb-2">
+                <i data-feather="file-text" class="me-2 text-primary" style="width: 18px; height: 18px;"></i>
+                <h6 class="text-muted mb-0 small text-uppercase fw-bold">Titre</h6>
+            </div>
+            <p class="mb-0 fw-semibold text-dark fs-6">@Reclamation.Title</p>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <!-- Client -->
+            <div class="col-md-6">
+                <div class="calendar-info-card">
+                    <div class="d-flex align-items-center mb-2">
+                        <i data-feather="user" class="me-2 text-primary" style="width: 16px; height: 16px;"></i>
+                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Client</h6>
+                    </div>
+                    <p class="mb-0 fw-medium">@Reclamation.ClientName</p>
+                </div>
+            </div>
+
+            <!-- Article -->
+            <div class="col-md-6">
+                <div class="calendar-info-card">
+                    <div class="d-flex align-items-center mb-2">
+                        <i data-feather="package" class="me-2 text-primary" style="width: 16px; height: 16px;"></i>
+                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Article</h6>
+                    </div>
+                    <p class="mb-0 fw-medium">@Reclamation.ArticleName</p>
+                </div>
+            </div>
+
+            <!-- Date de création -->
+            <div class="col-md-6">
+                <div class="calendar-info-card">
+                    <div class="d-flex align-items-center mb-2">
+                        <i data-feather="clock" class="me-2 text-primary" style="width: 16px; height: 16px;"></i>
+                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Date de création</h6>
+                    </div>
+                    <p class="mb-0 fw-medium">@Reclamation.CreatedAt.ToString("dd/MM/yyyy")</p>
+                    <small class="text-muted">@Reclamation.CreatedAt.ToString("HH:mm")</small>
+                </div>
+            </div>
+
+            <!-- Statut -->
+            <div class="col-md-6">
+                <div class="calendar-info-card">
+                    <div class="d-flex align-items-center mb-2">
+                        <i data-feather="info" class="me-2 text-primary" style="width: 16px; height: 16px;"></i>
+                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Statut</h6>
+                    </div>
+                    <MudChip Size="Size.Medium" Color="@GetStatusColor(Reclamation.Status)" Variant="Variant.Filled">
+                        @GetStatusLabel(Reclamation.Status)
+                    </MudChip>
+                </div>
+            </div>
+        </div>
+
+        <!-- Priorité et Garantie -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="d-flex align-items-center mb-2">
+                    <i data-feather="flag" class="me-2 text-primary" style="width: 18px; height: 18px;"></i>
+                    <h6 class="text-muted mb-0 small text-uppercase fw-bold">Priorité</h6>
+                </div>
+                <MudChip Size="Size.Medium" Color="@GetPriorityColor(Reclamation.Priority)" Variant="Variant.Filled">
+                    @GetPriorityIcon(Reclamation.Priority) @GetPriorityLabel(Reclamation.Priority)
+                </MudChip>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex align-items-center mb-2">
+                    <i data-feather="shield" class="me-2 text-primary" style="width: 18px; height: 18px;"></i>
+                    <h6 class="text-muted mb-0 small text-uppercase fw-bold">Garantie</h6>
+                </div>
+                @if (Reclamation.IsUnderWarranty)
+                {
+                    <MudChip Size="Size.Medium" Color="Color.Success" Variant="Variant.Filled">
+                        ✅ Sous garantie
+                    </MudChip>
+                }
+                else
+                {
+                    <MudChip Size="Size.Medium" Color="Color.Default" Variant="Variant.Filled">
+                        ❌ Hors garantie
+                    </MudChip>
+                }
+            </div>
+        </div>
+
+        <!-- Interventions -->
+        @if (Reclamation.InterventionCount > 0)
+        {
+            <div class="mb-3">
+                <div class="d-flex align-items-center mb-2">
+                    <i data-feather="tool" class="me-2 text-primary" style="width: 18px; height: 18px;"></i>
+                    <h6 class="text-muted mb-0 small text-uppercase fw-bold">Interventions</h6>
+                </div>
+                <MudChip Size="Size.Medium" Color="Color.Info" Variant="Variant.Filled">
+                    @Reclamation.InterventionCount intervention(s)
+                </MudChip>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Color="Color.Default">
+            <i data-feather="x" class="me-1" style="width: 16px; height: 16px;"></i> Fermer
+        </MudButton>
+        <MudButton OnClick="ViewDetails" Variant="Variant.Filled" Color="Color.Primary">
+            <i data-feather="eye" class="me-1" style="width: 16px; height: 16px;"></i> Voir détails complets
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public ReclamationListDto Reclamation { get; set; } = null!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void ViewDetails()
+    {
+        Navigation.NavigateTo($"/reclamations/{Reclamation.Id}");
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private Color GetStatusColor(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => Color.Primary,
+        ReclamationStatus.InProgress => Color.Warning,
+        ReclamationStatus.PendingIntervention => Color.Warning,
+        ReclamationStatus.InterventionScheduled => Color.Info,
+        ReclamationStatus.UnderIntervention => Color.Warning,
+        ReclamationStatus.PendingInvoice => Color.Warning,
+        ReclamationStatus.Closed => Color.Success,
+        ReclamationStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+
+    private string GetStatusLabel(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "Nouvelle",
+        ReclamationStatus.InProgress => "En cours",
+        ReclamationStatus.PendingIntervention => "En attente d'intervention",
+        ReclamationStatus.InterventionScheduled => "Intervention planifiée",
+        ReclamationStatus.UnderIntervention => "Sous intervention",
+        ReclamationStatus.PendingInvoice => "En attente de facture",
+        ReclamationStatus.Closed => "Fermée",
+        ReclamationStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    private Color GetPriorityColor(Priority priority) => priority switch
+    {
+        Priority.High => Color.Error,
+        Priority.Medium => Color.Warning,
+        Priority.Low => Color.Success,
+        _ => Color.Default
+    };
+
+    private string GetPriorityIcon(Priority priority) => priority switch
+    {
+        Priority.High => "🔴",
+        Priority.Medium => "🟡",
+        Priority.Low => "🟢",
+        _ => ""
+    };
+
+    private string GetPriorityLabel(Priority priority) => priority switch
+    {
+        Priority.High => "Haute",
+        Priority.Medium => "Moyenne",
+        Priority.Low => "Basse",
+        _ => priority.ToString()
+    };
+}
+

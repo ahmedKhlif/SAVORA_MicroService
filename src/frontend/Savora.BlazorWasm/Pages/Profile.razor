@@ -1,0 +1,445 @@
+@page "/profile"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IClientService ClientService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<PageTitle>SAVORA - Mon Profil</PageTitle>
+
+<PageHeader Title="Mon Profil" Subtitle="Gérez vos informations personnelles et votre mot de passe" Icon="user" />
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row">
+        <!-- Profile Picture & Header -->
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="profile-picture-container me-4 position-relative">
+                            @if (!string.IsNullOrEmpty(_user?.ProfilePictureUrl))
+                            {
+                                <img src="@GetImageUrl(_user.ProfilePictureUrl)" alt="@_fullName" class="profile-picture-large" />
+                            }
+                            else
+                            {
+                                <div class="profile-picture-large profile-picture-placeholder">
+                                    <i data-feather="user" style="width: 64px; height: 64px;"></i>
+                                </div>
+                            }
+                            <label class="profile-picture-upload-btn" for="profile-picture-input" title="Changer la photo">
+                                <i data-feather="camera" style="width: 20px; height: 20px;"></i>
+                            </label>
+                            <InputFile id="profile-picture-input" OnChange="HandleProfilePictureUpload" accept="image/*" style="display: none;" />
+                        </div>
+                        <div class="flex-grow-1">
+                            <h2 class="mb-1">@_fullName</h2>
+                            <p class="text-muted mb-2">@_email</p>
+                            <div class="d-flex gap-2">
+                                <span class="badge @(_role == "ResponsableSAV" ? "bg-primary" : "bg-secondary")">
+                                    @(_role == "ResponsableSAV" ? "Responsable SAV" : "Client")
+                                </span>
+                                @if (_user != null && _user.IsBlocked)
+                                {
+                                    <span class="badge bg-danger">Compte bloqué</span>
+                                }
+                                else if (_user != null && !_user.IsActive)
+                                {
+                                    <span class="badge bg-warning">Compte inactif</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personal Information -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="user" class="me-2"></i> Informations personnelles
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@_profileModel" OnValidSubmit="HandleUpdateProfile">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nom complet</label>
+                            <InputText @bind-Value="_profileModel.FullName" class="form-control" />
+                            <ValidationMessage For="@(() => _profileModel.FullName)" class="text-danger small" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Email</label>
+                            <p class="mb-0">@_email</p>
+                            <small class="text-muted">L'email ne peut pas être modifié</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Rôle</label>
+                            <div>
+                                <span class="badge @(_role == "ResponsableSAV" ? "bg-primary" : "bg-secondary")">
+                                    @(_role == "ResponsableSAV" ? "Responsable SAV" : "Client")
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Compte créé le</label>
+                            <p class="mb-0">@(_user?.CreatedAt.ToString("dd MMMM yyyy à HH:mm") ?? "-")</p>
+                        </div>
+
+                        @if (_user?.LastLoginAt.HasValue == true)
+                        {
+                            <div class="mb-0">
+                                <label class="form-label text-muted small">Dernière connexion</label>
+                                <p class="mb-0">@_user.LastLoginAt.Value.ToString("dd MMMM yyyy à HH:mm")</p>
+                            </div>
+                        }
+
+                        <button type="submit" class="btn btn-primary mt-3" disabled="@_isUpdatingProfile">
+                            @if (_isUpdatingProfile)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            <span>Enregistrer les modifications</span>
+                        </button>
+                    </EditForm>
+
+                    @if (_client != null)
+                    {
+                        <hr />
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Téléphone</label>
+                            <p class="mb-0">@(_client.Phone ?? "-")</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Adresse</label>
+                            <p class="mb-0">@(_client.Address ?? "-")</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">Ville</label>
+                            <p class="mb-0">@(_client.City ?? "-")</p>
+                        </div>
+
+                        <div class="mb-0">
+                            <label class="form-label text-muted small">Membre depuis</label>
+                            <p class="mb-0">@_client.CreatedAt.ToString("dd MMMM yyyy")</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i data-feather="lock" class="me-2"></i> Changer le mot de passe
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@_passwordModel" OnValidSubmit="HandleChangePassword">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Mot de passe actuel</label>
+                            <InputText type="password" @bind-Value="_passwordModel.CurrentPassword" class="form-control" placeholder="••••••••" />
+                            <ValidationMessage For="@(() => _passwordModel.CurrentPassword)" class="text-danger small" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Nouveau mot de passe</label>
+                            <InputText type="password" @bind-Value="_passwordModel.NewPassword" class="form-control" placeholder="••••••••" />
+                            <ValidationMessage For="@(() => _passwordModel.NewPassword)" class="text-danger small" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Confirmer le nouveau mot de passe</label>
+                            <InputText type="password" @bind-Value="_passwordModel.ConfirmPassword" class="form-control" placeholder="••••••••" />
+                            <ValidationMessage For="@(() => _passwordModel.ConfirmPassword)" class="text-danger small" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" disabled="@_isChangingPassword">
+                            @if (_isChangingPassword)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            <span>Changer le mot de passe</span>
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics (for clients only) -->
+        @if (_client != null)
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i data-feather="bar-chart-2" class="me-2"></i> Statistiques
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="p-3 rounded text-center" style="background-color: #eff6ff;">
+                                    <h2 class="text-primary mb-1">@_client.TotalReclamations</h2>
+                                    <small class="text-muted">Réclamations totales</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 rounded text-center" style="background-color: #fef3c7;">
+                                    <h2 class="mb-1" style="color: #F59E0B;">@_client.ActiveReclamations</h2>
+                                    <small class="text-muted">Réclamations actives</small>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="p-3 rounded text-center" style="background-color: #ecfdf5;">
+                                    <h2 class="text-success mb-1">@_client.TotalArticles</h2>
+                                    <small class="text-muted">Articles enregistrés</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string _fullName = "";
+    private string _email = "";
+    private string _role = "";
+    private UserDto? _user;
+    private ClientDto? _client;
+    private bool _isLoading = true;
+    private bool _isChangingPassword = false;
+    private bool _isUpdatingProfile = false;
+    private ChangePasswordModel _passwordModel = new();
+    private UpdateProfileModel _profileModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        _isLoading = true;
+        try
+        {
+            var userResult = await AuthService.GetCurrentUserAsync();
+            if (userResult.Success && userResult.Data != null)
+            {
+                _user = userResult.Data;
+                _fullName = _user.FullName;
+                _email = _user.Email;
+                _role = _user.Role;
+                _profileModel.FullName = _user.FullName;
+            }
+            else
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                _fullName = user.FindFirst("name")?.Value ?? user.FindFirst("unique_name")?.Value ?? "";
+                _email = user.FindFirst("email")?.Value ?? "";
+                _role = user.FindFirst("role")?.Value ?? user.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+                _profileModel.FullName = _fullName;
+            }
+
+            if (_role == "Client")
+            {
+                var clientResult = await ClientService.GetCurrentClientAsync();
+                if (clientResult.Success)
+                {
+                    _client = clientResult.Data;
+                    if (_client != null)
+                    {
+                        _fullName = _client.FullName;
+                        _email = _client.Email;
+                        _profileModel.FullName = _client.FullName;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleUpdateProfile()
+    {
+        _isUpdatingProfile = true;
+        try
+        {
+            var result = await AuthService.UpdateProfileAsync(_profileModel.FullName);
+            if (result.Success && result.Data != null)
+            {
+                _user = result.Data;
+                _fullName = _user.FullName;
+                Snackbar.Add("Profil mis à jour avec succès!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la mise à jour", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isUpdatingProfile = false;
+        }
+    }
+
+    private async Task HandleProfilePictureUpload(InputFileChangeEventArgs e)
+    {
+        if (e.File == null) return;
+
+        var file = e.File;
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+        var fileExtension = System.IO.Path.GetExtension(file.Name).ToLowerInvariant();
+        
+        if (!allowedExtensions.Contains(fileExtension))
+        {
+            Snackbar.Add("Format de fichier non supporté. Utilisez JPG, PNG ou GIF.", Severity.Warning);
+            return;
+        }
+
+        if (file.Size > 5 * 1024 * 1024) // 5MB
+        {
+            Snackbar.Add("Le fichier est trop volumineux. Taille maximale: 5MB", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var result = await AuthService.UploadProfilePictureAsync(file);
+            if (result.Success && result.Data != null)
+            {
+                _user = result.Data;
+                Snackbar.Add("Photo de profil mise à jour avec succès!", Severity.Success);
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de l'upload", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task HandleChangePassword()
+    {
+        if (_passwordModel.NewPassword != _passwordModel.ConfirmPassword)
+        {
+            Snackbar.Add("Les mots de passe ne correspondent pas", Severity.Warning);
+            return;
+        }
+
+        _isChangingPassword = true;
+        try
+        {
+            var result = await AuthService.ChangePasswordAsync(_passwordModel.CurrentPassword, _passwordModel.NewPassword);
+            
+            if (result.Success)
+            {
+                Snackbar.Add("Mot de passe modifié avec succès!", Severity.Success);
+                _passwordModel = new ChangePasswordModel();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors du changement de mot de passe", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isChangingPassword = false;
+        }
+    }
+
+    private string GetImageUrl(string? relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return string.Empty;
+
+        // If already a full URL, return as is
+        if (relativePath.StartsWith("http://") || relativePath.StartsWith("https://"))
+            return relativePath;
+
+        // Use API Gateway if enabled, otherwise use AuthService directly
+        var useGateway = Configuration.GetValue<bool>("ApiSettings:UseGateway", false);
+        if (useGateway)
+        {
+            var gatewayUrl = Configuration["ApiSettings:GatewayUrl"] ?? "http://localhost:5010";
+            return $"{gatewayUrl}{relativePath}";
+        }
+        else
+        {
+            var authServiceUrl = Configuration["ApiSettings:AuthServiceUrl"] ?? "http://localhost:5001";
+            return $"{authServiceUrl}{relativePath}";
+        }
+    }
+
+    public class ChangePasswordModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Mot de passe actuel requis")]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nouveau mot de passe requis")]
+        [System.ComponentModel.DataAnnotations.MinLength(6, ErrorMessage = "Minimum 6 caractères")]
+        public string NewPassword { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Confirmation requise")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    public class UpdateProfileModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Le nom complet est requis")]
+        [System.ComponentModel.DataAnnotations.StringLength(200, ErrorMessage = "Maximum 200 caractères")]
+        public string FullName { get; set; } = string.Empty;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

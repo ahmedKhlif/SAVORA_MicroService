@@ -1,0 +1,155 @@
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="@_isDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <RedirectToLogin />
+                    }
+                    else
+                    {
+                        <MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+                            <MudPaper Class="pa-8 text-center" Elevation="3">
+                                <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Error" Class="mb-4" />
+                                <MudText Typo="Typo.h5" Class="mb-4">Accès refusé</MudText>
+                                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                                    Vous n'avez pas les autorisations nécessaires pour accéder à cette page.
+                                </MudText>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/">
+                                    Retour à l'accueil
+                                </MudButton>
+                            </MudPaper>
+                        </MudContainer>
+                    }
+                </NotAuthorized>
+                <Authorizing>
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                </Authorizing>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Page non trouvée</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+                    <MudPaper Class="pa-8 text-center" Elevation="3">
+                        <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Warning" Class="mb-4" />
+                        <MudText Typo="Typo.h4" Class="mb-4">404</MudText>
+                        <MudText Typo="Typo.h5" Class="mb-4">Page non trouvée</MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                            La page que vous recherchez n'existe pas ou a été déplacée.
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/">
+                            Retour à l'accueil
+                        </MudButton>
+                    </MudPaper>
+                </MudContainer>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+@code {
+    private bool _isDarkMode = false;
+
+    private readonly MudTheme _theme = new()
+    {
+        Palette = new PaletteLight()
+        {
+            Primary = "#2563EB",
+            PrimaryDarken = "#1E40AF",
+            Secondary = "#06B6D4",
+            Background = "#F8FAFC",
+            Surface = "#FFFFFF",
+            AppbarBackground = "#FFFFFF",
+            DrawerBackground = "#F8FAFC",
+            Success = "#16A34A",
+            Warning = "#F59E0B",
+            Error = "#DC2626",
+            Info = "#2563EB",
+            TextPrimary = "#1E293B",
+            TextSecondary = "#64748B",
+            ActionDefault = "#64748B",
+            ActionDisabled = "#CBD5E1",
+            Divider = "#E2E8F0",
+            DrawerIcon = "#64748B",
+            DrawerText = "#1E293B",
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#3B82F6",
+            PrimaryDarken = "#2563EB",
+            Secondary = "#22D3EE",
+            Background = "#0F172A",
+            Surface = "#1E293B",
+            AppbarBackground = "#1E293B",
+            DrawerBackground = "#0F172A",
+            Success = "#22C55E",
+            Warning = "#FBBF24",
+            Error = "#EF4444",
+            Info = "#3B82F6",
+            TextPrimary = "#F1F5F9",
+            TextSecondary = "#94A3B8",
+            ActionDefault = "#94A3B8",
+            ActionDisabled = "#475569",
+            Divider = "#334155",
+            DrawerIcon = "#94A3B8",
+            DrawerText = "#F1F5F9",
+        },
+        Typography = new Typography()
+        {
+            Default = new Default()
+            {
+                FontFamily = new[] { "Inter", "Roboto", "Helvetica", "Arial", "sans-serif" }
+            },
+            H1 = new H1()
+            {
+                FontSize = "2rem",
+                FontWeight = 600
+            },
+            H2 = new H2()
+            {
+                FontSize = "1.5rem",
+                FontWeight = 600
+            },
+            H3 = new H3()
+            {
+                FontSize = "1.25rem",
+                FontWeight = 600
+            },
+            H4 = new H4()
+            {
+                FontSize = "1.125rem",
+                FontWeight = 600
+            },
+            H5 = new H5()
+            {
+                FontSize = "1rem",
+                FontWeight = 600
+            },
+            H6 = new H6()
+            {
+                FontSize = "0.875rem",
+                FontWeight = 600
+            },
+            Body1 = new Body1()
+            {
+                FontSize = "0.875rem"
+            },
+            Body2 = new Body2()
+            {
+                FontSize = "0.8125rem"
+            }
+        },
+        LayoutProperties = new LayoutProperties()
+        {
+            DefaultBorderRadius = "8px"
+        }
+    };
+}
+

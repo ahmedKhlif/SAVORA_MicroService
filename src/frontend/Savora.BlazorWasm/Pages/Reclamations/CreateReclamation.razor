@@ -1,0 +1,273 @@
+@page "/reclamations/new"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IReclamationService ReclamationService
+@inject IArticleService ArticleService
+@inject IClientService ClientService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Nouvelle Réclamation</PageTitle>
+
+<PageHeader Title="Créer une réclamation" Subtitle="Créez une nouvelle réclamation pour un client" Icon="alert-circle" />
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="@_model" OnValidSubmit="SubmitReclamation">
+                    <DataAnnotationsValidator />
+                    
+                    <!-- Step 1: Select Client -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">
+                            <span class="badge bg-primary me-2">1</span>
+                            Sélectionner le client
+                        </h5>
+                        @if (_isLoadingClients)
+                        {
+                            <div class="text-center py-3">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <select class="form-select" @bind="_selectedClientId" @bind:after="OnClientSelected">
+                                <option value="">-- Sélectionner un client --</option>
+                                @foreach (var client in _clients)
+                                {
+                                    <option value="@client.Id">@client.FullName (@client.Email)</option>
+                                }
+                            </select>
+                        }
+                    </div>
+
+                    <!-- Step 2: Select Article (if client selected) -->
+                    @if (_selectedClientId != Guid.Empty)
+                    {
+                        <div class="mb-4">
+                            <h5 class="mb-3">
+                                <span class="badge bg-primary me-2">2</span>
+                                Sélectionner l'article
+                            </h5>
+                            @if (_isLoadingArticles)
+                            {
+                                <div class="text-center py-3">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Chargement...</span>
+                                    </div>
+                                </div>
+                            }
+                            else if (_articles.Any())
+                            {
+                                <select class="form-select" @bind="_model.ClientArticleId">
+                                    <option value="">-- Sélectionner un article --</option>
+                                    @foreach (var article in _articles)
+                                    {
+                                        <option value="@article.Id">@article.Name (@article.Reference)</option>
+                                    }
+                                </select>
+                                <ValidationMessage For="@(() => _model.ClientArticleId)" class="text-danger small" />
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning">
+                                    <i data-feather="alert-triangle" class="me-2"></i>
+                                    Ce client n'a aucun article enregistré.
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Step 3: Reclamation Details -->
+                        <div class="mb-4">
+                            <h5 class="mb-3">
+                                <span class="badge bg-primary me-2">3</span>
+                                Détails de la réclamation
+                            </h5>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Titre *</label>
+                                <InputText @bind-Value="_model.Title" class="form-control" placeholder="Ex: Problème avec l'écran" />
+                                <ValidationMessage For="@(() => _model.Title)" class="text-danger small" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Description *</label>
+                                <InputTextArea @bind-Value="_model.Description" class="form-control" rows="5" placeholder="Décrivez le problème en détail..." />
+                                <ValidationMessage For="@(() => _model.Description)" class="text-danger small" />
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">
+                                Annuler
+                            </button>
+                            <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                                @if (_isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                else
+                                {
+                                    <i data-feather="save" class="me-2"></i>
+                                }
+                                Créer la réclamation
+                            </button>
+                        </div>
+                    }
+                </EditForm>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Help Card -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i data-feather="help-circle" class="me-2"></i>
+                    Aide
+                </h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Pour créer une réclamation :
+                </p>
+                <ol class="small text-muted">
+                    <li>Sélectionnez le client concerné</li>
+                    <li>Choisissez l'article en question</li>
+                    <li>Remplissez les détails de la réclamation</li>
+                </ol>
+                <div class="alert alert-info small mb-0">
+                    <i data-feather="info" class="me-2"></i>
+                    <strong>Note :</strong> La réclamation sera créée avec le statut "Nouvelle" et une priorité par défaut.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private CreateReclamationRequest _model = new();
+    private List<ClientDto> _clients = new();
+    private List<ArticleDto> _articles = new();
+    private Guid _selectedClientId = Guid.Empty;
+    private bool _isLoadingClients = true;
+    private bool _isLoadingArticles = false;
+    private bool _isSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClients();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+    }
+
+    private async Task LoadClients()
+    {
+        _isLoadingClients = true;
+        try
+        {
+            var result = await ClientService.GetAllAsync(1, 1000);
+            if (result.Success && result.Data != null)
+            {
+                _clients = result.Data.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors du chargement des clients: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingClients = false;
+        }
+    }
+
+    private async Task OnClientSelected()
+    {
+        if (_selectedClientId == Guid.Empty)
+        {
+            _articles.Clear();
+            _model.ClientArticleId = Guid.Empty;
+            return;
+        }
+
+        _isLoadingArticles = true;
+        try
+        {
+            // Get client's articles
+            var articlesResult = await ArticleService.GetByClientIdAsync(_selectedClientId);
+            if (articlesResult.Success && articlesResult.Data != null)
+            {
+                _articles = articlesResult.Data;
+            }
+            else
+            {
+                _articles.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors du chargement des articles: {ex.Message}", Severity.Error);
+            _articles.Clear();
+        }
+        finally
+        {
+            _isLoadingArticles = false;
+        }
+    }
+
+    private async Task SubmitReclamation()
+    {
+        if (_selectedClientId == Guid.Empty)
+        {
+            Snackbar.Add("Veuillez sélectionner un client", Severity.Warning);
+            return;
+        }
+
+        if (_model.ClientArticleId == Guid.Empty)
+        {
+            Snackbar.Add("Veuillez sélectionner un article", Severity.Warning);
+            return;
+        }
+
+        _isSubmitting = true;
+        try
+        {
+            var result = await ReclamationService.CreateAsync(_model);
+            if (result.Success)
+            {
+                Snackbar.Add("Réclamation créée avec succès", Severity.Success);
+                Navigation.NavigateTo("/reclamations");
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la création", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/reclamations");
+    }
+}
+

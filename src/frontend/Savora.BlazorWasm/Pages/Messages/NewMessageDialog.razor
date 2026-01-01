@@ -1,0 +1,236 @@
+@using MudBlazor
+@inject IAuthService AuthService
+@inject IMessageService MessageService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-items-center">
+            <i data-feather="mail" class="me-2" style="width: 20px; height: 20px;"></i>
+            <MudText Typo="Typo.h6">Composer un nouveau message</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_isLoadingUsers)
+        {
+            <div class="text-center py-3">
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                <MudText Typo="Typo.body2" Class="mt-2">Chargement des utilisateurs...</MudText>
+            </div>
+        }
+        else
+        {
+            <MudSelect @bind-Value="_selectedUserId" 
+                       Label="Destinataire *" 
+                       Variant="Variant.Outlined" 
+                       Margin="Margin.Normal"
+                       Required="true"
+                       RequiredError="Veuillez sélectionner un destinataire">
+                <MudSelectItem Value="@Guid.Empty">-- Sélectionner un destinataire --</MudSelectItem>
+                @foreach (var user in _users)
+                {
+                    @if (user.Id != CurrentUserId)
+                    {
+                        <MudSelectItem Value="@user.Id">
+                            <div class="d-flex align-items-center">
+                                @if (!string.IsNullOrEmpty(user.ProfilePictureUrl))
+                                {
+                                    <img src="@GetImageUrl(user.ProfilePictureUrl)" alt="@user.FullName" 
+                                         class="rounded-circle me-2" style="width: 24px; height: 24px; object-fit: cover;" 
+                                         onerror="this.style.display='none';" />
+                                }
+                                <div>
+                                    <div>@user.FullName</div>
+                                    <small class="text-muted">@user.Email</small>
+                                </div>
+                            </div>
+                        </MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            <MudAutocomplete T="string" @bind-Value="_subject" 
+                            Label="Sujet (optionnel)" 
+                            Variant="Variant.Outlined" 
+                            Margin="Margin.Normal"
+                            SearchFunc="@SearchSubjects"
+                            ToStringFunc="@(s => s ?? string.Empty)"
+                            Placeholder="Ex: Question sur ma réclamation"
+                            MaxItems="10" />
+            <MudTextField @bind-Value="_content" 
+                          Label="Message *" 
+                          Variant="Variant.Outlined" 
+                          Margin="Margin.Normal" 
+                          Lines="5"
+                          Required="true"
+                          RequiredError="Le message est requis"
+                          Placeholder="Tapez votre message ici..." />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Annuler</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="Send" 
+                   Disabled="@(_selectedUserId == Guid.Empty || string.IsNullOrWhiteSpace(_content) || _isSending || _isLoadingUsers)">
+            @if (_isSending)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Envoi...</MudText>
+            }
+            else
+            {
+                <i data-feather="send" class="me-1" style="width: 16px; height: 16px;"></i>
+                <span>Envoyer</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Guid CurrentUserId { get; set; }
+    
+    private List<UserDto> _users = new();
+    private Guid _selectedUserId = Guid.Empty;
+    private string _subject = string.Empty;
+    private string _content = string.Empty;
+    private bool _isLoadingUsers = true;
+    private bool _isSending = false;
+    
+    private readonly List<string> _subjectSuggestions = new()
+    {
+        "Question sur ma réclamation",
+        "Demande d'information sur l'intervention",
+        "Problème avec mon article",
+        "Demande de rendez-vous",
+        "Question sur la garantie",
+        "Suivi de ma réclamation",
+        "Demande de pièce détachée",
+        "Question sur la facture",
+        "Problème technique",
+        "Demande de devis",
+        "Réclamation urgente",
+        "Question sur le statut",
+        "Demande d'assistance",
+        "Information complémentaire",
+        "Question sur les délais",
+        "Demande de modification",
+        "Problème de livraison",
+        "Question sur le paiement",
+        "Demande de documentation",
+        "Autre question"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoadingUsers = true;
+        try
+        {
+            // Use GetUsersForMessagesAsync which is accessible to all authenticated users
+            var result = await AuthService.GetUsersForMessagesAsync();
+            if (result.Success && result.Data != null)
+            {
+                _users = result.Data;
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors du chargement des utilisateurs", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors du chargement des utilisateurs: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingUsers = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+    }
+
+    private string GetImageUrl(string? relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return string.Empty;
+
+        // If already a full URL, return as is
+        if (relativePath.StartsWith("http://") || relativePath.StartsWith("https://"))
+            return relativePath;
+
+        // Use API Gateway if enabled, otherwise use AuthService directly
+        var useGateway = Configuration.GetValue<bool>("ApiSettings:UseGateway", false);
+        if (useGateway)
+        {
+            var gatewayUrl = Configuration["ApiSettings:GatewayUrl"] ?? "http://localhost:5010";
+            return $"{gatewayUrl}{relativePath}";
+        }
+        else
+        {
+            var authServiceUrl = Configuration["ApiSettings:AuthServiceUrl"] ?? "http://localhost:5001";
+            return $"{authServiceUrl}{relativePath}";
+        }
+    }
+
+    private Task<IEnumerable<string>> SearchSubjects(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult<IEnumerable<string>>(_subjectSuggestions);
+
+        var filtered = _subjectSuggestions
+            .Where(s => s.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return Task.FromResult<IEnumerable<string>>(filtered);
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Send()
+    {
+        if (_selectedUserId == Guid.Empty || string.IsNullOrWhiteSpace(_content))
+        {
+            Snackbar.Add("Veuillez remplir tous les champs requis", Severity.Warning);
+            return;
+        }
+
+        _isSending = true;
+        try
+        {
+            var request = new CreateMessageRequest
+            {
+                ReceiverId = _selectedUserId,
+                Subject = _subject,
+                Content = _content
+            };
+
+            var result = await MessageService.SendMessageAsync(request);
+            if (result.Success)
+            {
+                Snackbar.Add("Message envoyé avec succès", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de l'envoi", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSending = false;
+        }
+    }
+}
+

@@ -1,0 +1,229 @@
+@page "/invoices/{Id:guid}"
+@attribute [Authorize]
+@inject IInvoiceService InvoiceService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>SAVORA - Facture</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else if (_invoice == null)
+{
+    <div class="alert alert-danger">
+        <i data-feather="alert-circle" class="me-2"></i> Facture non trouvée
+    </div>
+}
+else
+{
+    <div class="no-print mb-3">
+        <a href="/invoices" class="btn btn-link text-muted ps-0">
+            <i data-feather="arrow-left" class="me-2"></i> Retour aux factures
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card invoice-print">
+                <div class="card-body p-5">
+                    <!-- Header -->
+                    <div class="row mb-5">
+                        <div class="col-6">
+                            <img src="img/logo.png" alt="SAVORA" style="height: 50px;" class="mb-2" />
+                            <h2 class="text-primary mb-0">SAVORA</h2>
+                            <small class="text-muted">Service Après-Vente</small>
+                        </div>
+                        <div class="col-6 text-end">
+                            <h3 class="text-uppercase text-muted mb-2">Facture</h3>
+                            <h4 class="mb-1">@_invoice.InvoiceNumber</h4>
+                            <p class="text-muted mb-0">Date: @_invoice.CreatedAt.ToString("dd/MM/yyyy")</p>
+                        </div>
+                    </div>
+
+                    <hr class="mb-4" />
+
+                    <!-- Client & Intervention Info -->
+                    <div class="row mb-5">
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted text-uppercase mb-2">Client</h6>
+                            <h5 class="mb-0">@_invoice.ClientName</h5>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted text-uppercase mb-2">Intervention</h6>
+                            <p class="mb-0">@_invoice.ReclamationTitle</p>
+                        </div>
+                    </div>
+
+                    @if (_invoice.IsFree)
+                    {
+                        <div class="alert alert-success mb-4">
+                            <h5 class="alert-heading mb-1"><i data-feather="check-circle" class="me-2"></i> Intervention gratuite</h5>
+                            <p class="mb-0">Article sous garantie - Aucun montant à payer</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Parts Table -->
+                        @if (_invoice.Parts.Any())
+                        {
+                            <h6 class="text-muted text-uppercase mb-3">Pièces détachées</h6>
+                            <div class="table-responsive mb-4">
+                                <table class="table table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Désignation</th>
+                                            <th class="text-center" style="width: 80px;">Qté</th>
+                                            <th class="text-end" style="width: 120px;">P.U.</th>
+                                            <th class="text-end" style="width: 120px;">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var part in _invoice.Parts)
+                                        {
+                                            <tr>
+                                                <td>@part.PartName</td>
+                                                <td class="text-center">@part.Quantity</td>
+                                                <td class="text-end">@part.UnitPrice.ToString("N2")</td>
+                                                <td class="text-end">@part.TotalPrice.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot class="table-light">
+                                        <tr class="fw-bold">
+                                            <td colspan="3">Sous-total pièces</td>
+                                            <td class="text-end">@_invoice.PartsTotal.ToString("N2") TND</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        }
+
+                        <!-- Labor Table -->
+                        @if (_invoice.Labor.Any())
+                        {
+                            <h6 class="text-muted text-uppercase mb-3">Main d'œuvre</h6>
+                            <div class="table-responsive mb-4">
+                                <table class="table table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Description</th>
+                                            <th class="text-center" style="width: 80px;">Heures</th>
+                                            <th class="text-end" style="width: 120px;">Taux</th>
+                                            <th class="text-end" style="width: 120px;">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var labor in _invoice.Labor)
+                                        {
+                                            <tr>
+                                                <td>@(labor.Description ?? "Main d'œuvre")</td>
+                                                <td class="text-center">@labor.Hours</td>
+                                                <td class="text-end">@labor.HourlyRate.ToString("N2")</td>
+                                                <td class="text-end">@labor.TotalAmount.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot class="table-light">
+                                        <tr class="fw-bold">
+                                            <td colspan="3">Sous-total main d'œuvre</td>
+                                            <td class="text-end">@_invoice.LaborTotal.ToString("N2") TND</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        }
+
+                        <!-- Total -->
+                        <div class="bg-primary text-white p-4 rounded mb-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h4 class="mb-0">TOTAL À PAYER</h4>
+                                <h3 class="mb-0">@_invoice.TotalAmount.ToString("N2") TND</h3>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Actions -->
+                    <div class="d-flex justify-content-end gap-2 no-print">
+                        <button type="button" class="btn btn-primary btn-lg" @onclick="PrintInvoice">
+                            <i data-feather="printer" class="me-2"></i> Imprimer
+                        </button>
+                        <button type="button" class="btn btn-danger btn-lg" @onclick="DownloadPdf">
+                            <i data-feather="download" class="me-2"></i> Télécharger PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private InvoiceDetailDto? _invoice;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInvoice();
+    }
+
+    private async Task LoadInvoice()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await InvoiceService.GetByIdAsync(Id);
+            if (result.Success)
+            {
+                _invoice = result.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task PrintInvoice()
+    {
+        await JS.InvokeVoidAsync("window.print");
+    }
+
+    private async Task DownloadPdf()
+    {
+        try
+        {
+            var result = await InvoiceService.GetPdfAsync(Id);
+            if (result.Success && result.Data != null)
+            {
+                // Convert bytes to blob URL and download
+                await JS.InvokeVoidAsync("downloadFile", Convert.ToBase64String(result.Data), $"invoice-{Id}.pdf", "application/pdf");
+            }
+            else
+            {
+                Snackbar.Add("PDF non disponible", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync("initFeatherIcons");
+    }
+}

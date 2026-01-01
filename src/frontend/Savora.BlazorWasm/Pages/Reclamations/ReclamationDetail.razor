@@ -1,0 +1,507 @@
+@page "/reclamations/{Id:guid}"
+@attribute [Authorize]
+@inject IReclamationService ReclamationService
+@inject IInterventionService InterventionService
+@inject INotificationService NotificationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Détail Réclamation</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else if (_reclamation == null)
+{
+    <div class="alert alert-danger">
+        <i data-feather="alert-circle" class="me-2"></i> Réclamation non trouvée
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <a href="javascript:history.back()" class="btn btn-link text-muted ps-0">
+            <i data-feather="arrow-left" class="me-2"></i> Retour
+        </a>
+    </div>
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-start mb-4">
+        <div>
+            <h1 class="h3 mb-2">@_reclamation.Title</h1>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge @GetPriorityBadgeClass(_reclamation.Priority)">@GetPriorityLabel(_reclamation.Priority)</span>
+                <span class="badge @GetStatusBadgeClass(_reclamation.Status)">@GetStatusLabel(_reclamation.Status)</span>
+                @if (_reclamation.IsUnderWarranty)
+                {
+                    <span class="badge bg-success"><i data-feather="shield" style="width: 12px; height: 12px;"></i> Sous garantie</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Informations</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Client</h6>
+                            <p class="mb-0 fw-medium">@_reclamation.ClientName</p>
+                            <small class="text-muted">@_reclamation.ClientEmail</small><br />
+                            <small class="text-muted">@_reclamation.ClientPhone</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Article</h6>
+                            <p class="mb-0 fw-medium">@_reclamation.ArticleName</p>
+                            <small class="text-muted">Réf: @_reclamation.ArticleReference</small>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <h6 class="text-muted mb-2">Description</h6>
+                    <p style="white-space: pre-wrap;">@_reclamation.Description</p>
+
+                    @if (_reclamation.SlaDeadline.HasValue)
+                    {
+                        <hr />
+                        <div class="d-flex align-items-center gap-3">
+                            <div>
+                                <h6 class="text-muted mb-1">Délai SLA</h6>
+                                <p class="mb-0">@_reclamation.SlaDeadline.Value.ToString("dd/MM/yyyy HH:mm")</p>
+                            </div>
+                            <span class="badge @GetSlaBadgeClass(_reclamation.SlaStatus)">@GetSlaLabel(_reclamation.SlaStatus)</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Historique</h5>
+                </div>
+                <div class="card-body">
+                    @if (_reclamation.History.Any())
+                    {
+                        <div class="timeline">
+                            @foreach (var item in _reclamation.History.OrderByDescending(h => h.ChangedAt))
+                            {
+                                <div class="timeline-item mb-3 pb-3 border-bottom">
+                                    <div class="d-flex">
+                                        <div class="me-3">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center @GetTimelineBgClass(item.ActionType)" style="width: 32px; height: 32px;">
+                                                <i data-feather="@GetTimelineIcon(item.ActionType)" class="text-white" style="width: 16px; height: 16px;"></i>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted">@item.ChangedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                            <p class="mb-1 fw-medium">@GetActionLabel(item)</p>
+                                            @if (!string.IsNullOrEmpty(item.Comment))
+                                            {
+                                                <p class="text-muted mb-1">"@item.Comment"</p>
+                                            }
+                                            <small class="text-muted">par @item.ChangedBy</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center py-3">Aucun historique</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Interventions -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Interventions (@_interventions.Count)</h5>
+                    <AuthorizeView Roles="ResponsableSAV">
+                        <button type="button" class="btn btn-primary btn-sm" @onclick="CreateIntervention">
+                            <i data-feather="plus" class="me-1"></i> Nouvelle
+                        </button>
+                    </AuthorizeView>
+                </div>
+                <div class="card-body">
+                    @if (_interventions.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var intervention in _interventions)
+                            {
+                                <a href="/interventions/@intervention.Id" class="list-group-item list-group-item-action">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Intervention du @intervention.PlannedDate.ToString("dd/MM/yyyy")</h6>
+                                            <small class="text-muted">@(intervention.TechnicianName ?? "Non assigné")</small>
+                                        </div>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            @if (intervention.IsFree)
+                                            {
+                                                <span class="badge bg-success">Gratuite</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="fw-medium">@intervention.TotalAmount.ToString("N2") TND</span>
+                                            }
+                                            <span class="badge @GetInterventionStatusBadge(intervention.Status)">@GetInterventionStatusLabel(intervention.Status)</span>
+                                        </div>
+                                    </div>
+                                </a>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center py-4">Aucune intervention pour cette réclamation</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Actions -->
+            <AuthorizeView Roles="ResponsableSAV">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Actions</h5>
+                    </div>
+                    <div class="card-body d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary" @onclick="UpdateStatus">
+                            <i data-feather="edit" class="me-2"></i> Modifier statut
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" @onclick="UpdatePriority">
+                            <i data-feather="alert-triangle" class="me-2"></i> Modifier priorité
+                        </button>
+                        @if (_reclamation.Status != ReclamationStatus.Closed)
+                        {
+                            <button type="button" class="btn btn-success" @onclick="CloseReclamation">
+                                <i data-feather="check-circle" class="me-2"></i> Clôturer
+                            </button>
+                        }
+                    </div>
+                </div>
+            </AuthorizeView>
+
+            <!-- Details -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Détails</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Créée le</small>
+                        <span>@_reclamation.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                    </div>
+                    @if (_reclamation.UpdatedAt.HasValue)
+                    {
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Dernière mise à jour</small>
+                            <span>@_reclamation.UpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                        </div>
+                    }
+                    @if (_reclamation.ClosedAt.HasValue)
+                    {
+                        <div class="mb-3">
+                            <small class="text-muted d-block">Clôturée le</small>
+                            <span>@_reclamation.ClosedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                            <small class="text-muted d-block">par @_reclamation.ClosedBy</small>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Attachments -->
+            @if (_reclamation.Attachments.Any())
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Pièces jointes (@_reclamation.Attachments.Count)</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var attachment in _reclamation.Attachments)
+                            {
+                                <li class="d-flex align-items-center mb-2">
+                                    <i data-feather="paperclip" class="me-2 text-muted" style="width: 16px; height: 16px;"></i>
+                                    <div>
+                                        <span class="d-block">@attachment.FileName</span>
+                                        <small class="text-muted">@FormatFileSize(attachment.Size)</small>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ReclamationDto? _reclamation;
+    private List<InterventionListDto> _interventions = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var recResult = await ReclamationService.GetByIdAsync(Id);
+            if (recResult.Success)
+            {
+                _reclamation = recResult.Data;
+            }
+
+            var intResult = await InterventionService.GetByReclamationIdAsync(Id);
+            if (intResult.Success && intResult.Data != null)
+            {
+                _interventions = intResult.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged(); // Ensure UI updates
+        }
+    }
+
+    private async Task UpdateStatus()
+    {
+        var parameters = new DialogParameters
+        {
+            ["ReclamationId"] = Id,
+            ["CurrentStatus"] = _reclamation!.Status
+        };
+        
+        var dialog = await DialogService.ShowAsync<UpdateStatusDialog>("Modifier le statut", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && result.Data is ReclamationDto updatedReclamation)
+        {
+            // Update immediately with the data returned from the server
+            _reclamation = updatedReclamation;
+            StateHasChanged();
+            Snackbar.Add("Statut mis à jour", Severity.Success);
+            
+            // Refresh notifications count if user is on notifications page
+            try
+            {
+                await NotificationService.GetUnreadCountAsync();
+            }
+            catch { /* Ignore notification refresh errors */ }
+        }
+        else if (!result.Canceled)
+        {
+            // Fallback: reload from server if data is not available
+            await LoadData();
+            Snackbar.Add("Statut mis à jour", Severity.Success);
+            
+            // Refresh notifications count
+            try
+            {
+                await NotificationService.GetUnreadCountAsync();
+            }
+            catch { /* Ignore notification refresh errors */ }
+        }
+    }
+
+    private async Task UpdatePriority()
+    {
+        var parameters = new DialogParameters
+        {
+            ["ReclamationId"] = Id,
+            ["CurrentPriority"] = _reclamation!.Priority
+        };
+        
+        var dialog = await DialogService.ShowAsync<UpdatePriorityDialog>("Modifier la priorité", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && result.Data is ReclamationDto updatedReclamation)
+        {
+            // Update immediately with the data returned from the server
+            _reclamation = updatedReclamation;
+            StateHasChanged();
+            Snackbar.Add("Priorité mise à jour", Severity.Success);
+        }
+        else if (!result.Canceled)
+        {
+            // Fallback: reload from server if data is not available
+            await LoadData();
+            Snackbar.Add("Priorité mise à jour", Severity.Success);
+        }
+    }
+
+    private async Task CloseReclamation()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Clôturer la réclamation",
+            "Êtes-vous sûr de vouloir clôturer cette réclamation ?",
+            yesText: "Oui, clôturer", cancelText: "Annuler");
+
+        if (confirm == true)
+        {
+            var result = await ReclamationService.CloseAsync(Id);
+            if (result.Success && result.Data != null)
+            {
+                // Update immediately with the data returned from the server
+                _reclamation = result.Data;
+                StateHasChanged();
+                Snackbar.Add("Réclamation clôturée", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la clôture", Severity.Error);
+            }
+        }
+    }
+
+    private void CreateIntervention()
+    {
+        Navigation.NavigateTo($"/interventions/new?reclamationId={Id}&isUnderWarranty={_reclamation?.IsUnderWarranty}");
+    }
+
+    private string GetPriorityBadgeClass(Priority priority) => priority switch
+    {
+        Priority.Urgent => "bg-danger",
+        Priority.High => "bg-warning",
+        Priority.Medium => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private string GetPriorityLabel(Priority priority) => priority switch
+    {
+        Priority.Urgent => "Urgente",
+        Priority.High => "Haute",
+        Priority.Medium => "Moyenne",
+        Priority.Low => "Basse",
+        _ => priority.ToString()
+    };
+
+    private string GetStatusBadgeClass(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "bg-info",
+        ReclamationStatus.InProgress => "bg-warning",
+        ReclamationStatus.Closed => "bg-success",
+        ReclamationStatus.Cancelled => "bg-secondary",
+        _ => "bg-primary"
+    };
+
+    private string GetStatusLabel(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "Nouvelle",
+        ReclamationStatus.InProgress => "En cours",
+        ReclamationStatus.PendingIntervention => "Attente intervention",
+        ReclamationStatus.InterventionScheduled => "Intervention planifiée",
+        ReclamationStatus.UnderIntervention => "En intervention",
+        ReclamationStatus.PendingInvoice => "Attente facture",
+        ReclamationStatus.Closed => "Clôturée",
+        ReclamationStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    private string GetSlaBadgeClass(string slaStatus) => slaStatus switch
+    {
+        "Overdue" => "bg-danger",
+        "NearDeadline" => "bg-warning",
+        _ => "bg-success"
+    };
+
+    private string GetSlaLabel(string slaStatus) => slaStatus switch
+    {
+        "Overdue" => "En retard",
+        "NearDeadline" => "Proche",
+        _ => "À temps"
+    };
+
+    private string GetTimelineBgClass(string actionType) => actionType switch
+    {
+        "Created" => "bg-success",
+        "StatusChange" => "bg-primary",
+        "PriorityChange" => "bg-warning",
+        _ => "bg-secondary"
+    };
+
+    private string GetTimelineIcon(string actionType) => actionType switch
+    {
+        "Created" => "plus",
+        "StatusChange" => "refresh-cw",
+        "PriorityChange" => "arrow-up",
+        _ => "circle"
+    };
+
+    private string GetActionLabel(ReclamationHistoryDto item)
+    {
+        return item.ActionType switch
+        {
+            "Created" => "Réclamation créée",
+            "StatusChange" => $"Statut: {GetStatusLabel(item.OldStatus!.Value)} → {GetStatusLabel(item.NewStatus!.Value)}",
+            "PriorityChange" => $"Priorité: {GetPriorityLabel(item.OldPriority!.Value)} → {GetPriorityLabel(item.NewPriority!.Value)}",
+            _ => item.ActionType
+        };
+    }
+
+    private string GetInterventionStatusBadge(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "bg-info",
+        InterventionStatus.InProgress => "bg-warning",
+        InterventionStatus.Completed => "bg-success",
+        InterventionStatus.Cancelled => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetInterventionStatusLabel(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "Planifiée",
+        InterventionStatus.InProgress => "En cours",
+        InterventionStatus.Completed => "Terminée",
+        InterventionStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

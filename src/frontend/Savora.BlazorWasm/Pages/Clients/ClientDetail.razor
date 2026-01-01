@@ -1,0 +1,353 @@
+@page "/clients/{Id:guid}"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@using Savora.Shared.Enums
+@inject IClientService ClientService
+@inject IArticleService ArticleService
+@inject IReclamationService ReclamationService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Détail Client</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else if (_client == null)
+{
+    <div class="alert alert-danger">
+        <i data-feather="alert-circle" class="me-2"></i> Client non trouvé
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <a href="javascript:history.back()" class="btn btn-link text-muted ps-0">
+            <i data-feather="arrow-left" class="me-2"></i> Retour
+        </a>
+    </div>
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-start mb-4">
+        <div>
+            <div class="d-flex align-items-center mb-2">
+                <div class="avatar avatar-lg me-3 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 64px; height: 64px; font-size: 24px;">
+                    @(_client.FullName?.Substring(0, 1).ToUpper())
+                </div>
+                <div>
+                    <h1 class="h3 mb-1">@_client.FullName</h1>
+                    <p class="text-muted mb-0">@_client.Email</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Informations personnelles</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Email</h6>
+                            <p class="mb-0"><a href="mailto:@_client.Email">@_client.Email</a></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Téléphone</h6>
+                            <p class="mb-0">@(_client.Phone ?? "-")</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Adresse</h6>
+                            <p class="mb-0">@(_client.Address ?? "-")</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Ville</h6>
+                            <p class="mb-0">@(_client.City ?? "-")</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Inscrit le</h6>
+                            <p class="mb-0">@_client.CreatedAt.ToString("dd/MM/yyyy")</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reclamations -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Réclamations (@_reclamations.Count)</h5>
+                    <a href="/reclamations?clientId=@_client.Id" class="btn btn-sm btn-outline-primary">Voir tout</a>
+                </div>
+                <div class="card-body">
+                    @if (_reclamations.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var reclamation in _reclamations.Take(5))
+                            {
+                                <a href="/reclamations/@reclamation.Id" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">@reclamation.Title</h6>
+                                            <p class="mb-1 text-muted small">@reclamation.ArticleName</p>
+                                            <small class="text-muted">Créée le @reclamation.CreatedAt.ToString("dd/MM/yyyy")</small>
+                                        </div>
+                                        <div class="ms-3">
+                                            <span class="badge @GetPriorityBadgeClass(reclamation.Priority)">@GetPriorityLabel(reclamation.Priority)</span>
+                                            <span class="badge @GetStatusBadgeClass(reclamation.Status)">@GetStatusLabel(reclamation.Status)</span>
+                                        </div>
+                                    </div>
+                                </a>
+                            }
+                        </div>
+                        @if (_reclamations.Count > 5)
+                        {
+                            <div class="text-center mt-3">
+                                <a href="/reclamations?clientId=@_client.Id" class="btn btn-sm btn-outline-primary">Voir toutes les réclamations (@_reclamations.Count)</a>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center py-3">Aucune réclamation</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Articles -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Articles (@_articles.Count)</h5>
+                    <a href="/articles?clientId=@_client.Id" class="btn btn-sm btn-outline-primary">Voir tout</a>
+                </div>
+                <div class="card-body">
+                    @if (_articles.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Référence</th>
+                                        <th>Nom</th>
+                                        <th>Marque</th>
+                                        <th>Catégorie</th>
+                                        <th>Garantie</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var article in _articles.Take(10))
+                                    {
+                                        <tr>
+                                            <td><code>@article.Reference</code></td>
+                                            <td>@article.Name</td>
+                                            <td>@article.Brand</td>
+                                            <td>@article.Category</td>
+                                            <td>
+                                                @if (article.IsUnderWarranty)
+                                                {
+                                                    <span class="badge bg-success">Valide</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">Expirée</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <a href="/articles/@article.Id" class="btn btn-sm btn-outline-primary">
+                                                    <i data-feather="eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (_articles.Count > 10)
+                        {
+                            <div class="text-center mt-3">
+                                <a href="/articles?clientId=@_client.Id" class="btn btn-sm btn-outline-primary">Voir tous les articles (@_articles.Count)</a>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center py-3">Aucun article</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Stats Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Statistiques</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-muted">Réclamations totales</span>
+                        <span class="badge bg-primary">@_client.TotalReclamations</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-muted">Réclamations actives</span>
+                        <span class="badge bg-warning text-dark">@_client.ActiveReclamations</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-muted">Articles enregistrés</span>
+                        <span class="badge bg-info">@_client.TotalArticles</span>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small">Client depuis</span>
+                        <span class="small">@GetDaysSinceCreation() jours</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Actions rapides</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/reclamations/create?clientId=@_client.Id" class="btn btn-outline-primary">
+                            <i data-feather="plus-circle" class="me-2"></i> Créer une réclamation
+                        </a>
+                        <a href="/articles/create?clientId=@_client.Id" class="btn btn-outline-secondary">
+                            <i data-feather="package" class="me-2"></i> Ajouter un article
+                        </a>
+                        <a href="mailto:@_client.Email" class="btn btn-outline-info">
+                            <i data-feather="mail" class="me-2"></i> Envoyer un email
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ClientDto? _client;
+    private List<ReclamationListDto> _reclamations = new();
+    private List<ArticleDto> _articles = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            // Load client
+            var clientResult = await ClientService.GetByIdAsync(Id);
+            if (clientResult.Success && clientResult.Data != null)
+            {
+                _client = clientResult.Data;
+                
+                // Load reclamations - filter by client name since we don't have clientId in ReclamationListDto
+                var reclamationsResult = await ReclamationService.GetAllAsync(1, 100);
+                if (reclamationsResult.Success && reclamationsResult.Data != null)
+                {
+                    _reclamations = reclamationsResult.Data.Items
+                        .Where(r => r.ClientName == _client.FullName)
+                        .OrderByDescending(r => r.CreatedAt)
+                        .ToList();
+                }
+
+                // Load articles by client ID
+                var articlesResult = await ArticleService.GetByClientIdAsync(_client.Id);
+                if (articlesResult.Success && articlesResult.Data != null)
+                {
+                    _articles = articlesResult.Data
+                        .OrderByDescending(a => a.CreatedAt)
+                        .ToList();
+                }
+            }
+            else
+            {
+                Snackbar.Add("Client non trouvé", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetPriorityBadgeClass(Priority priority) => priority switch
+    {
+        Priority.Urgent => "bg-danger",
+        Priority.High => "bg-warning text-dark",
+        Priority.Medium => "bg-info",
+        Priority.Low => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private string GetPriorityLabel(Priority priority) => priority switch
+    {
+        Priority.Urgent => "Urgente",
+        Priority.High => "Haute",
+        Priority.Medium => "Moyenne",
+        Priority.Low => "Basse",
+        _ => priority.ToString()
+    };
+
+    private string GetStatusBadgeClass(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "bg-primary",
+        ReclamationStatus.InProgress => "bg-warning text-dark",
+        ReclamationStatus.PendingIntervention => "bg-info",
+        ReclamationStatus.InterventionScheduled => "bg-info",
+        ReclamationStatus.UnderIntervention => "bg-warning text-dark",
+        ReclamationStatus.PendingInvoice => "bg-secondary",
+        ReclamationStatus.Closed => "bg-success",
+        ReclamationStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusLabel(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "Nouvelle",
+        ReclamationStatus.InProgress => "En cours",
+        ReclamationStatus.PendingIntervention => "Attente intervention",
+        ReclamationStatus.InterventionScheduled => "Intervention planifiée",
+        ReclamationStatus.UnderIntervention => "En intervention",
+        ReclamationStatus.PendingInvoice => "Attente facture",
+        ReclamationStatus.Closed => "Clôturée",
+        ReclamationStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    private int GetDaysSinceCreation()
+    {
+        if (_client == null) return 0;
+        return (DateTime.UtcNow - _client.CreatedAt).Days;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}
+

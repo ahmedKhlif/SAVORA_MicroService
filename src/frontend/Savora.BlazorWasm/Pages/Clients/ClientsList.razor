@@ -1,0 +1,140 @@
+@page "/clients"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IClientService ClientService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Clients</PageTitle>
+
+<PageHeader Title="Clients" Subtitle="Consultez les informations clients" Icon="user-check" />
+
+<!-- Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <label class="form-label">Rechercher</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i data-feather="search"></i></span>
+                    <input type="text" class="form-control" placeholder="Nom, email, téléphone..." 
+                           @bind="_searchTerm" @bind:event="oninput" @onkeyup="@(async () => await LoadClients())" />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Liste des clients (@_clients.Count)</h5>
+    </div>
+    @if (_isLoading)
+    {
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (_clients.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover my-0">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Email</th>
+                        <th class="d-none d-md-table-cell">Téléphone</th>
+                        <th class="d-none d-lg-table-cell">Ville</th>
+                        <th class="d-none d-md-table-cell">Inscrit le</th>
+                        <th>Réclamations</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var client in _clients)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar avatar-sm me-2 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                        @(client.FullName?.Substring(0, 1).ToUpper())
+                                    </div>
+                                    <span class="fw-medium">@client.FullName</span>
+                                </div>
+                            </td>
+                            <td><a href="mailto:@client.Email">@client.Email</a></td>
+                            <td class="d-none d-md-table-cell">@(client.Phone ?? "-")</td>
+                            <td class="d-none d-lg-table-cell">@(client.City ?? "-")</td>
+                            <td class="d-none d-md-table-cell">@client.CreatedAt.ToString("dd/MM/yyyy")</td>
+                            <td>
+                                <span class="badge bg-primary">@client.TotalReclamations total</span>
+                                @if (client.ActiveReclamations > 0)
+                                {
+                                    <span class="badge bg-warning text-dark">@client.ActiveReclamations actives</span>
+                                }
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="@(() => ViewClient(client.Id))" title="Voir détails">
+                                    <i data-feather="eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="card-body empty-state">
+            <i data-feather="user-check" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+            <h5 class="mt-3">Aucun client trouvé</h5>
+            <p>Aucun client ne correspond à votre recherche.</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ClientDto> _clients = new();
+    private bool _isLoading = true;
+    private string _searchTerm = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClients();
+    }
+
+    private async Task LoadClients()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await ClientService.GetAllAsync(1, 100, _searchTerm);
+            if (result.Success && result.Data != null)
+            {
+                _clients = result.Data.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ViewClient(Guid id)
+    {
+        Navigation.NavigateTo($"/clients/{id}");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

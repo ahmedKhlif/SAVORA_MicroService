@@ -1,0 +1,313 @@
+@inject IDashboardService DashboardService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<PageHeader Title="Tableau de bord" Subtitle="Bienvenue sur votre espace client SAVORA" Icon="home" />
+
+@if (_isLoading)
+{
+    <div class="row">
+        @for (int i = 0; i < 4; i++)
+        {
+            <div class="col-sm-6 col-xl-3">
+                <div class="card">
+                    <div class="card-body placeholder-glow">
+                        <span class="placeholder col-6"></span>
+                        <span class="placeholder col-4 mt-2"></span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <!-- KPI Cards -->
+    <div class="row">
+        <div class="col-sm-6 col-xl-3">
+            <div class="card hover-lift">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col mt-0">
+                            <h5 class="card-title text-muted">Total Réclamations</h5>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stat text-primary">
+                                <i class="align-middle" data-feather="file-text"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <h1 class="mt-1 mb-3 text-primary">@_dashboard.TotalReclamations</h1>
+                    <div class="mb-0">
+                        <span class="text-muted">Depuis votre inscription</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="card hover-lift">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col mt-0">
+                            <h5 class="card-title text-muted">En cours</h5>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stat" style="background: rgba(245, 158, 11, 0.1);">
+                                <i class="align-middle" data-feather="clock" style="color: #F59E0B;"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <h1 class="mt-1 mb-3" style="color: #F59E0B;">@_dashboard.ActiveReclamations</h1>
+                    <div class="mb-0">
+                        <span class="text-muted">Réclamations actives</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="card hover-lift">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col mt-0">
+                            <h5 class="card-title text-muted">Résolues</h5>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stat" style="background: rgba(22, 163, 74, 0.1);">
+                                <i class="align-middle" data-feather="check-circle" style="color: #16A34A;"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <h1 class="mt-1 mb-3" style="color: #16A34A;">@_dashboard.ClosedReclamations</h1>
+                    <div class="mb-0">
+                        <span class="text-muted">Réclamations clôturées</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="card hover-lift">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col mt-0">
+                            <h5 class="card-title text-muted">Notifications</h5>
+                        </div>
+                        <div class="col-auto">
+                            <div class="stat" style="background: rgba(6, 182, 212, 0.1);">
+                                <i class="align-middle" data-feather="bell" style="color: #06B6D4;"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <h1 class="mt-1 mb-3" style="color: #06B6D4;">@_dashboard.UnreadNotifications</h1>
+                    <div class="mb-0">
+                        <span class="text-muted">Non lues</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Reclamations -->
+        <div class="col-12 col-lg-8">
+            <div class="card flex-fill">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Réclamations récentes</h5>
+                    <a href="/my-reclamations" class="btn btn-sm btn-outline-primary">
+                        Voir tout <i data-feather="arrow-right" class="ms-1"></i>
+                    </a>
+                </div>
+                @if (_dashboard.RecentReclamations.Any())
+                {
+                    <table class="table table-hover my-0">
+                        <thead>
+                            <tr>
+                                <th>Titre</th>
+                                <th class="d-none d-md-table-cell">Date</th>
+                                <th>Priorité</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var reclamation in _dashboard.RecentReclamations)
+                            {
+                                <tr style="cursor: pointer;" @onclick="@(() => Navigation.NavigateTo($"/reclamations/{reclamation.Id}"))">
+                                    <td>@reclamation.Title</td>
+                                    <td class="d-none d-md-table-cell">@reclamation.CreatedAt.ToString("dd/MM/yyyy")</td>
+                                    <td>
+                                        <span class="badge @GetPriorityBadgeClass(reclamation.Priority)">
+                                            @GetPriorityLabel(reclamation.Priority)
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(reclamation.Status)">
+                                            @GetStatusLabel(reclamation.Status)
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="card-body empty-state">
+                        <i data-feather="inbox" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+                        <h5 class="mt-3">Aucune réclamation</h5>
+                        <p>Vous n'avez pas encore de réclamations.</p>
+                        <a href="/my-reclamations/new" class="btn btn-primary mt-2">
+                            <i data-feather="plus" class="me-1"></i> Créer une réclamation
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Quick Actions & Upcoming Interventions -->
+        <div class="col-12 col-lg-4">
+            <!-- Upcoming Interventions -->
+            @if (_dashboard.UpcomingInterventions.Any())
+            {
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Interventions à venir</h5>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var intervention in _dashboard.UpcomingInterventions)
+                        {
+                            <div class="mb-3 pb-3 border-bottom">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <h6 class="mb-0">@intervention.ReclamationTitle</h6>
+                                </div>
+                                <small class="text-muted d-block">
+                                    <i data-feather="calendar" style="width: 14px; height: 14px;"></i>
+                                    @intervention.PlannedDate.ToString("dd/MM/yyyy HH:mm")
+                                </small>
+                                @if (!string.IsNullOrEmpty(intervention.TechnicianName))
+                                {
+                                    <small class="text-muted d-block">
+                                        <i data-feather="user" style="width: 14px; height: 14px;"></i>
+                                        @intervention.TechnicianName
+                                    </small>
+                                }
+                            </div>
+                        }
+                        <a href="/interventions" class="btn btn-sm btn-outline-primary w-100">
+                            Voir toutes les interventions
+                        </a>
+                    </div>
+                </div>
+            }
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Actions rapides</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/my-reclamations/new" class="btn btn-primary">
+                            <i data-feather="plus" class="me-2"></i> Nouvelle réclamation
+                        </a>
+                        <a href="/my-articles" class="btn btn-outline-primary">
+                            <i data-feather="package" class="me-2"></i> Mes articles (@_dashboard.TotalArticles)
+                        </a>
+                        <a href="/invoices" class="btn btn-outline-secondary">
+                            <i data-feather="file-text" class="me-2"></i> Mes factures
+                        </a>
+                        <a href="/notifications" class="btn btn-outline-info">
+                            <i data-feather="bell" class="me-2"></i> Notifications 
+                            @if (_dashboard.UnreadNotifications > 0)
+                            {
+                                <span class="badge bg-danger ms-1">@_dashboard.UnreadNotifications</span>
+                            }
+                        </a>
+                        <a href="/profile" class="btn btn-outline-secondary">
+                            <i data-feather="user" class="me-2"></i> Mon profil
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ClientDashboardDto _dashboard = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var result = await DashboardService.GetClientDashboardAsync();
+            if (result.Success && result.Data != null)
+            {
+                _dashboard = result.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur lors du chargement du tableau de bord: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+        }
+    }
+
+    private string GetPriorityBadgeClass(string priority) => priority switch
+    {
+        "Urgent" => "bg-danger",
+        "High" => "bg-warning text-dark",
+        "Medium" => "bg-info",
+        "Low" => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private string GetPriorityLabel(string priority) => priority switch
+    {
+        "Urgent" => "Urgente",
+        "High" => "Haute",
+        "Medium" => "Moyenne",
+        "Low" => "Basse",
+        _ => priority
+    };
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "New" => "bg-primary",
+        "InProgress" => "bg-warning text-dark",
+        "Closed" => "bg-success",
+        "Cancelled" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusLabel(string status) => status switch
+    {
+        "New" => "Nouvelle",
+        "InProgress" => "En cours",
+        "PendingIntervention" => "Attente intervention",
+        "InterventionScheduled" => "Intervention planifiée",
+        "UnderIntervention" => "En intervention",
+        "PendingInvoice" => "Attente facture",
+        "Closed" => "Clôturée",
+        "Cancelled" => "Annulée",
+        _ => status
+    };
+}

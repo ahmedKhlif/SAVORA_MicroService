@@ -1,0 +1,323 @@
+/* SAVORA Custom Styles */
+:root {
+    --primary: #2563EB;
+    --primary-dark: #1E40AF;
+    --accent: #06B6D4;
+    --bg-light: #F8FAFC;
+    --bg-dark: #0F172A;
+    --success: #16A34A;
+    --warning: #F59E0B;
+    --error: #DC2626;
+    --urgent: #BE123C;
+}
+
+html, body {
+    font-family: 'Inter', 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background-color: #F8FAFC;
+}
+
+/* Dark mode override */
+[data-theme="dark"] html,
+[data-theme="dark"] body,
+.dark-mode html,
+.dark-mode body {
+    background-color: var(--bs-body-bg);
+}
+
+/* Loading Screen */
+.loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+}
+
+.loading-content {
+    text-align: center;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.loading-logo {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 1.5rem;
+}
+
+.loading-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #F8FAFC;
+    margin: 0;
+    letter-spacing: 0.1em;
+    background: linear-gradient(90deg, #2563EB, #06B6D4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.loading-subtitle {
+    font-size: 0.875rem;
+    color: #94A3B8;
+    margin: 0.5rem 0 1.5rem;
+    font-weight: 400;
+}
+
+.loading-progress {
+    width: 200px;
+    height: 4px;
+    background: #334155;
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.loading-progress-bar {
+    height: 100%;
+    width: 30%;
+    background: linear-gradient(90deg, #2563EB, #06B6D4);
+    border-radius: 2px;
+    animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(200%); }
+    100% { transform: translateX(-100%); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Error UI */
+#blazor-error-ui {
+    background: #DC2626;
+    color: white;
+    padding: 0.75rem 1rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    display: none !important;
+    font-size: 0.875rem;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+#blazor-error-ui.show {
+    display: block !important;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 1rem;
+}
+
+#blazor-error-ui .reload {
+    color: white;
+    text-decoration: underline;
+    margin-left: 0.5rem;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
+
+/* Dark mode scrollbar */
+.mud-theme-dark ::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+.mud-theme-dark ::-webkit-scrollbar-thumb:hover {
+    background: #64748B;
+}
+
+/* Card hover effects */
+.hover-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Status chips */
+.status-chip {
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+}
+
+/* Priority indicators */
+.priority-low { color: #16A34A; }
+.priority-medium { color: #F59E0B; }
+.priority-high { color: #EA580C; }
+.priority-urgent { color: #BE123C; }
+
+/* SLA indicators */
+.sla-ontime { color: #16A34A; }
+.sla-near { color: #F59E0B; }
+.sla-overdue { color: #DC2626; }
+
+/* Animations */
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Dashboard KPI Cards */
+.kpi-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+}
+
+.kpi-card:hover {
+    border-left-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.kpi-label {
+    font-size: 0.875rem;
+    color: #64748B;
+    margin-top: 0.5rem;
+}
+
+/* Timeline styles */
+.timeline-item {
+    position: relative;
+    padding-left: 2rem;
+    padding-bottom: 1.5rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #E2E8F0;
+}
+
+.timeline-item:last-child::before {
+    bottom: 100%;
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -4px;
+    top: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px var(--primary);
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    color: #CBD5E1;
+    margin-bottom: 1rem;
+}
+
+.empty-state-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1E293B;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-text {
+    color: #64748B;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+/* Logo styles */
+.savora-logo {
+    font-weight: 700;
+    font-size: 1.5rem;
+    background: linear-gradient(90deg, #2563EB, #06B6D4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Auth pages background */
+.auth-background {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Responsive utilities */
+@media (max-width: 600px) {
+    .kpi-value {
+        font-size: 1.5rem;
+    }
+    
+    .loading-title {
+        font-size: 2rem;
+    }
+}
+
+/* Print styles */
+@media print {
+    .mud-drawer,
+    .mud-appbar,
+    .no-print {
+        display: none !important;
+    }
+    
+    .mud-main-content {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+}
+

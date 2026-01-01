@@ -1,0 +1,203 @@
+@page "/articles"
+@attribute [Authorize(Roles = "ResponsableSAV")]
+@inject IArticleService ArticleService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>SAVORA - Articles</PageTitle>
+
+<PageHeader Title="Articles" Subtitle="Gérez les articles vendus aux clients" Icon="package">
+    <button type="button" class="btn btn-primary" @onclick="CreateArticle">
+        <i data-feather="plus" class="me-2"></i> Nouvel article
+    </button>
+</PageHeader>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Rechercher</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i data-feather="search"></i></span>
+                    <input type="text" class="form-control" placeholder="Référence, nom, marque..." 
+                           @bind="_searchTerm" @bind:event="oninput" @onkeyup="@(async () => await LoadArticles())" />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Catégorie</label>
+                <select class="form-select" @bind="_categoryFilter" @bind:after="LoadArticles">
+                    <option value="">Toutes les catégories</option>
+                    @foreach (var cat in _categories)
+                    {
+                        <option value="@cat">@cat</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Catalogue (@_articles.Count articles)</h5>
+    </div>
+    @if (_isLoading)
+    {
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else if (_articles.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover my-0">
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Nom</th>
+                        <th class="d-none d-md-table-cell">Marque</th>
+                        <th class="d-none d-lg-table-cell">Catégorie</th>
+                        <th class="d-none d-md-table-cell">Achat</th>
+                        <th>Garantie</th>
+                        <th class="d-none d-lg-table-cell">Client</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var article in _articles)
+                    {
+                        <tr>
+                            <td><code>@article.Reference</code></td>
+                            <td class="fw-medium">@article.Name</td>
+                            <td class="d-none d-md-table-cell">@article.Brand</td>
+                            <td class="d-none d-lg-table-cell">@article.Category</td>
+                            <td class="d-none d-md-table-cell">@article.PurchaseDate.ToString("dd/MM/yy")</td>
+                            <td>
+                                @if (article.IsUnderWarranty)
+                                {
+                                    <span class="badge bg-success">@article.WarrantyMonths m - Valide</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">@article.WarrantyMonths m - Expiré</span>
+                                }
+                            </td>
+                            <td class="d-none d-lg-table-cell">@(article.ClientName ?? "-")</td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-primary me-1" @onclick="@(() => EditArticle(article))" title="Modifier">
+                                    <i data-feather="edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="@(() => DeleteArticle(article))" title="Supprimer">
+                                    <i data-feather="trash-2"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="card-body empty-state">
+            <i data-feather="package" style="width: 64px; height: 64px; color: #CBD5E1;"></i>
+            <h5 class="mt-3">Aucun article trouvé</h5>
+            <p>Ajoutez votre premier article au catalogue.</p>
+            <button type="button" class="btn btn-primary mt-3" @onclick="CreateArticle">
+                <i data-feather="plus" class="me-2"></i> Ajouter un article
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ArticleDto> _articles = new();
+    private List<string> _categories = new();
+    private bool _isLoading = true;
+    private string _searchTerm = "";
+    private string? _categoryFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadArticles();
+    }
+
+    private async Task LoadArticles()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await ArticleService.GetAllAsync(1, 100, _searchTerm, _categoryFilter);
+            if (result.Success && result.Data != null)
+            {
+                _articles = result.Data.Items;
+                _categories = _articles.Select(a => a.Category).Distinct().Where(c => !string.IsNullOrEmpty(c)).ToList()!;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateArticle()
+    {
+        var dialog = await DialogService.ShowAsync<ArticleDialog>("Nouvel article");
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadArticles();
+            Snackbar.Add("Article créé", Severity.Success);
+        }
+    }
+
+    private async Task EditArticle(ArticleDto article)
+    {
+        var parameters = new DialogParameters { ["Article"] = article };
+        var dialog = await DialogService.ShowAsync<ArticleDialog>("Modifier article", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled)
+        {
+            await LoadArticles();
+            Snackbar.Add("Article modifié", Severity.Success);
+        }
+    }
+
+    private async Task DeleteArticle(ArticleDto article)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Supprimer l'article",
+            $"Êtes-vous sûr de vouloir supprimer {article.Name} ?",
+            yesText: "Supprimer", cancelText: "Annuler");
+
+        if (confirm == true)
+        {
+            var result = await ArticleService.DeleteAsync(article.Id);
+            if (result.Success)
+            {
+                await LoadArticles();
+                Snackbar.Add("Article supprimé", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("initFeatherIcons");
+    }
+}

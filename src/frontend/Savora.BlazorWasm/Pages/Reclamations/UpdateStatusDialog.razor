@@ -1,0 +1,89 @@
+@inject IReclamationService ReclamationService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudSelect T="ReclamationStatus" @bind-Value="_newStatus" Label="Nouveau statut" Variant="Variant.Outlined" 
+                   FullWidth="true" Class="mb-4">
+            @foreach (ReclamationStatus status in Enum.GetValues(typeof(ReclamationStatus)))
+            {
+                <MudSelectItem Value="@status">@GetStatusLabel(status)</MudSelectItem>
+            }
+        </MudSelect>
+        
+        <MudTextField @bind-Value="_comment" Label="Commentaire (optionnel)" Variant="Variant.Outlined"
+                      Lines="3" FullWidth="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Annuler</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@_isLoading">
+            @if (_isLoading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Enregistrer
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public Guid ReclamationId { get; set; }
+    [Parameter] public ReclamationStatus CurrentStatus { get; set; }
+
+    private ReclamationStatus _newStatus;
+    private string _comment = "";
+    private bool _isLoading = false;
+
+    protected override void OnInitialized()
+    {
+        _newStatus = CurrentStatus;
+    }
+
+    private async Task Submit()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await ReclamationService.UpdateStatusAsync(ReclamationId, new UpdateReclamationStatusRequest
+            {
+                NewStatus = _newStatus,
+                Comment = _comment
+            });
+
+            if (result.Success && result.Data != null)
+            {
+                // Return the updated reclamation data so the parent can update immediately
+                MudDialog.Close(DialogResult.Ok(result.Data));
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la mise à jour du statut", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private string GetStatusLabel(ReclamationStatus status) => status switch
+    {
+        ReclamationStatus.New => "Nouvelle",
+        ReclamationStatus.InProgress => "En cours",
+        ReclamationStatus.PendingIntervention => "Attente intervention",
+        ReclamationStatus.InterventionScheduled => "Intervention planifiée",
+        ReclamationStatus.UnderIntervention => "En intervention",
+        ReclamationStatus.PendingInvoice => "Attente facture",
+        ReclamationStatus.Closed => "Clôturée",
+        ReclamationStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+}
+

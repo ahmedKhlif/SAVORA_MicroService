@@ -1,0 +1,634 @@
+@page "/interventions/{Id:guid}"
+@attribute [Authorize]
+@inject IInterventionService InterventionService
+@inject ITechnicianService TechnicianService
+@inject IPartService PartService
+@inject IInvoiceService InvoiceService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IJSRuntime JS
+
+<PageTitle>SAVORA - Détail Intervention</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else if (_intervention == null)
+{
+    <div class="alert alert-danger">
+        <i data-feather="alert-circle" class="me-2"></i> Intervention non trouvée
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <a href="/interventions" class="btn btn-link text-muted ps-0">
+            <i data-feather="arrow-left" class="me-2"></i> Retour aux interventions
+        </a>
+    </div>
+
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-start mb-4">
+        <div>
+            <h1 class="h3 mb-2">Intervention du @_intervention.PlannedDate.ToString("dd/MM/yyyy")</h1>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge @GetStatusBadgeClass(_intervention.Status)">@GetStatusLabel(_intervention.Status)</span>
+                @if (_intervention.IsFree)
+                {
+                    <span class="badge bg-success">Gratuite (sous garantie)</span>
+                }
+                else
+                {
+                    <span class="badge bg-info">Payante</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Informations</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Réclamation</h6>
+                            <a href="/reclamations/@_intervention.ReclamationId">@_intervention.ReclamationTitle</a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Client</h6>
+                            <p class="mb-0 fw-medium">@_intervention.ClientName</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Technicien</h6>
+                            @if (!string.IsNullOrEmpty(_intervention.TechnicianName))
+                            {
+                                <p class="mb-0">@_intervention.TechnicianName</p>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">Non assigné</span>
+                            }
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Date planifiée</h6>
+                            <p class="mb-0">@_intervention.PlannedDate.ToString("dd/MM/yyyy HH:mm")</p>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_intervention.Notes))
+                    {
+                        <hr />
+                        <h6 class="text-muted mb-2">Notes</h6>
+                        <p style="white-space: pre-wrap;" class="mb-0">@_intervention.Notes</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Parts Used -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Pièces utilisées</h5>
+                    <AuthorizeView Roles="ResponsableSAV">
+                        @if (_intervention.Status != InterventionStatus.Completed)
+                        {
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddPart">
+                                <i data-feather="plus" class="me-1"></i> Ajouter
+                            </button>
+                        }
+                    </AuthorizeView>
+                </div>
+                <div class="card-body">
+                    @if (_intervention.PartsUsed.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Pièce</th>
+                                        <th class="text-center">Qté</th>
+                                        <th class="text-end">Prix unit.</th>
+                                        <th class="text-end">Total</th>
+                                        <AuthorizeView Roles="ResponsableSAV">
+                                            @if (_intervention.Status != InterventionStatus.Completed)
+                                            {
+                                                <th class="text-center" style="width: 80px;">Action</th>
+                                            }
+                                        </AuthorizeView>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var part in _intervention.PartsUsed)
+                                    {
+                                        <tr>
+                                            <td>@part.PartName</td>
+                                            <td class="text-center">@part.Quantity</td>
+                                            <td class="text-end">@part.UnitPrice.ToString("N2")</td>
+                                            <td class="text-end">@((part.Quantity * part.UnitPrice).ToString("N2"))</td>
+                                            <AuthorizeView Roles="ResponsableSAV">
+                                                @if (_intervention.Status != InterventionStatus.Completed)
+                                                {
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-danger" 
+                                                                @onclick="() => RemovePart(part.Id)" 
+                                                                title="Supprimer cette pièce"
+                                                                style="min-width: 35px;">
+                                                            <i data-feather="trash-2" style="width: 16px; height: 16px;"></i>
+                                                        </button>
+                                                    </td>
+                                                }
+                                            </AuthorizeView>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="fw-bold">
+                                        <AuthorizeView Roles="ResponsableSAV">
+                                            @if (_intervention.Status != InterventionStatus.Completed)
+                                            {
+                                                <td colspan="4">Total pièces</td>
+                                            }
+                                            else
+                                            {
+                                                <td colspan="3">Total pièces</td>
+                                            }
+                                        </AuthorizeView>
+                                        <AuthorizeView Roles="Client">
+                                            <td colspan="3">Total pièces</td>
+                                        </AuthorizeView>
+                                        <td class="text-end">@_intervention.PartsTotal.ToString("N2") TND</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center mb-0">Aucune pièce utilisée</p>
+                    }
+                </div>
+            </div>
+
+            <!-- Labor -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Main d'oeuvre</h5>
+                    <AuthorizeView Roles="ResponsableSAV">
+                        @if (_intervention.Status != InterventionStatus.Completed)
+                        {
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddLabor">
+                                <i data-feather="plus" class="me-1"></i> Ajouter
+                            </button>
+                        }
+                    </AuthorizeView>
+                </div>
+                <div class="card-body">
+                    @if (_intervention.Labor.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Description</th>
+                                        <th class="text-center">Heures</th>
+                                        <th class="text-end">Taux</th>
+                                        <th class="text-end">Total</th>
+                                        <AuthorizeView Roles="ResponsableSAV">
+                                            @if (_intervention.Status != InterventionStatus.Completed)
+                                            {
+                                                <th class="text-center" style="width: 80px;">Action</th>
+                                            }
+                                        </AuthorizeView>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var labor in _intervention.Labor)
+                                    {
+                                        <tr>
+                                            <td>@(labor.Description ?? "Main d'oeuvre")</td>
+                                            <td class="text-center">@labor.Hours</td>
+                                            <td class="text-end">@labor.HourlyRate.ToString("N2")</td>
+                                            <td class="text-end">@((labor.Hours * labor.HourlyRate).ToString("N2"))</td>
+                                            <AuthorizeView Roles="ResponsableSAV">
+                                                @if (_intervention.Status != InterventionStatus.Completed)
+                                                {
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-danger" 
+                                                                @onclick="() => RemoveLabor(labor.Id)" 
+                                                                title="Supprimer cette main d'oeuvre"
+                                                                style="min-width: 35px;">
+                                                            <i data-feather="trash-2" style="width: 16px; height: 16px;"></i>
+                                                        </button>
+                                                    </td>
+                                                }
+                                            </AuthorizeView>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="fw-bold">
+                                        <AuthorizeView Roles="ResponsableSAV">
+                                            @if (_intervention.Status != InterventionStatus.Completed)
+                                            {
+                                                <td colspan="4">Total main d'oeuvre</td>
+                                            }
+                                            else
+                                            {
+                                                <td colspan="3">Total main d'oeuvre</td>
+                                            }
+                                        </AuthorizeView>
+                                        <AuthorizeView Roles="Client">
+                                            <td colspan="3">Total main d'oeuvre</td>
+                                        </AuthorizeView>
+                                        <td class="text-end">@_intervention.LaborTotal.ToString("N2") TND</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center mb-0">Aucune main d'oeuvre enregistrée</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Actions -->
+            <AuthorizeView Roles="ResponsableSAV">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Actions</h5>
+                    </div>
+                    <div class="card-body d-grid gap-2">
+                        @if (string.IsNullOrEmpty(_intervention.TechnicianName))
+                        {
+                            <button type="button" class="btn btn-outline-primary" @onclick="AssignTechnician">
+                                <i data-feather="user-plus" class="me-2"></i> Assigner technicien
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-secondary" @onclick="AssignTechnician">
+                                <i data-feather="refresh-cw" class="me-2"></i> Changer technicien
+                            </button>
+                        }
+
+                        @if (_intervention.Status == InterventionStatus.Planned)
+                        {
+                            <button type="button" class="btn btn-warning" @onclick="StartIntervention">
+                                <i data-feather="play" class="me-2"></i> Démarrer
+                            </button>
+                        }
+
+                        @if (_intervention.Status == InterventionStatus.InProgress)
+                        {
+                            <button type="button" class="btn btn-success" @onclick="CompleteIntervention">
+                                <i data-feather="check" class="me-2"></i> Terminer
+                            </button>
+                        }
+
+                        @if (_intervention.Status == InterventionStatus.Completed && !_intervention.HasInvoice)
+                        {
+                            <button type="button" class="btn btn-primary" @onclick="GenerateInvoice">
+                                <i data-feather="file-text" class="me-2"></i> Générer facture
+                            </button>
+                        }
+
+                        @if (_intervention.Status != InterventionStatus.Completed && 
+                             _intervention.Status != InterventionStatus.Cancelled)
+                        {
+                            <button type="button" class="btn btn-outline-danger" @onclick="CancelIntervention">
+                                <i data-feather="x" class="me-2"></i> Annuler
+                            </button>
+                        }
+                    </div>
+                </div>
+            </AuthorizeView>
+
+            <!-- Total -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Résumé financier</h5>
+                </div>
+                <div class="card-body">
+                    @if (_intervention.IsFree)
+                    {
+                        <div class="alert alert-success mb-3">
+                            <i data-feather="check-circle" class="me-2"></i>
+                            Intervention gratuite (sous garantie)
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Pièces</span>
+                        <span>@_intervention.PartsTotal.ToString("N2") TND</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Main d'oeuvre</span>
+                        <span>@_intervention.LaborTotal.ToString("N2") TND</span>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between fw-bold fs-5">
+                        <span>Total</span>
+                        @if (_intervention.IsFree)
+                        {
+                            <span>0.00 TND</span>
+                        }
+                        else
+                        {
+                            <span>@_intervention.TotalAmount.ToString("N2") TND</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice -->
+            @if (_intervention.HasInvoice)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Facture</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">N° <strong>@_intervention.InvoiceNumber</strong></p>
+                        <button type="button" class="btn btn-danger w-100" @onclick="DownloadInvoice">
+                            <i data-feather="download" class="me-2"></i> Télécharger PDF
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private InterventionDto? _intervention;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIntervention();
+    }
+
+    private async Task LoadIntervention()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await InterventionService.GetByIdAsync(Id);
+            if (result.Success)
+            {
+                _intervention = result.Data;
+                StateHasChanged(); // Ensure UI updates
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erreur: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged(); // Ensure UI updates even if loading fails
+        }
+    }
+
+    private async Task AssignTechnician()
+    {
+        var parameters = new DialogParameters { ["InterventionId"] = Id };
+        var dialog = await DialogService.ShowAsync<AssignTechnicianDialog>("Assigner technicien", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && result.Data is InterventionDto updatedIntervention)
+        {
+            // Update immediately with the data returned from the server
+            _intervention = updatedIntervention;
+            StateHasChanged();
+            Snackbar.Add("Technicien assigné", Severity.Success);
+        }
+        else if (!result.Canceled)
+        {
+            // Fallback: reload from server if data is not available
+            await LoadIntervention();
+            StateHasChanged();
+            Snackbar.Add("Technicien assigné", Severity.Success);
+        }
+    }
+
+    private async Task AddPart()
+    {
+        var parameters = new DialogParameters { ["InterventionId"] = Id };
+        var dialog = await DialogService.ShowAsync<AddPartDialog>("Ajouter pièce", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && result.Data is InterventionDto updatedIntervention)
+        {
+            // Update immediately with the data returned from the server
+            _intervention = updatedIntervention;
+            StateHasChanged();
+            Snackbar.Add("Pièce ajoutée", Severity.Success);
+        }
+        else if (!result.Canceled)
+        {
+            // Fallback: reload from server if data is not available
+            await LoadIntervention();
+            Snackbar.Add("Pièce ajoutée", Severity.Success);
+        }
+    }
+
+    private async Task RemovePart(Guid partUsedId)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Supprimer la pièce",
+            "Êtes-vous sûr de vouloir supprimer cette pièce ?",
+            yesText: "Oui", cancelText: "Non");
+
+        if (confirm == true)
+        {
+            var result = await InterventionService.RemovePartAsync(Id, partUsedId);
+            if (result.Success && result.Data != null)
+            {
+                // Update immediately with the data returned from the server
+                _intervention = result.Data;
+                StateHasChanged();
+                Snackbar.Add("Pièce supprimée", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la suppression", Severity.Error);
+            }
+        }
+    }
+
+    private async Task RemoveLabor(Guid laborId)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Supprimer la main d'oeuvre",
+            "Êtes-vous sûr de vouloir supprimer cette entrée de main d'oeuvre ?",
+            yesText: "Oui", cancelText: "Non");
+
+        if (confirm == true)
+        {
+            var result = await InterventionService.RemoveLaborAsync(Id, laborId);
+            if (result.Success && result.Data != null)
+            {
+                // Update immediately with the data returned from the server
+                _intervention = result.Data;
+                StateHasChanged();
+                Snackbar.Add("Main d'oeuvre supprimée", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de la suppression", Severity.Error);
+            }
+        }
+    }
+
+    private async Task AddLabor()
+    {
+        var parameters = new DialogParameters { ["InterventionId"] = Id };
+        var dialog = await DialogService.ShowAsync<AddLaborDialog>("Ajouter main d'oeuvre", parameters);
+        var result = await dialog.Result;
+        
+        if (!result.Canceled && result.Data is InterventionDto updatedIntervention)
+        {
+            // Update immediately with the data returned from the server
+            _intervention = updatedIntervention;
+            StateHasChanged();
+            Snackbar.Add("Main d'oeuvre ajoutée", Severity.Success);
+        }
+        else if (!result.Canceled)
+        {
+            // Fallback: reload from server if data is not available
+            await LoadIntervention();
+            StateHasChanged();
+            Snackbar.Add("Main d'oeuvre ajoutée", Severity.Success);
+        }
+    }
+
+    private async Task StartIntervention()
+    {
+        var result = await InterventionService.StartAsync(Id);
+        if (result.Success && result.Data != null)
+        {
+            // Update immediately with the data returned from the server
+            _intervention = result.Data;
+            StateHasChanged();
+            Snackbar.Add("Intervention démarrée", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(result.Message ?? "Erreur lors du démarrage", Severity.Error);
+        }
+    }
+
+    private async Task CompleteIntervention()
+    {
+        var result = await InterventionService.CompleteAsync(Id);
+        if (result.Success && result.Data != null)
+        {
+            // Update immediately with the data returned from the server
+            _intervention = result.Data;
+            StateHasChanged();
+            Snackbar.Add("Intervention terminée", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(result.Message ?? "Erreur lors de la finalisation", Severity.Error);
+        }
+    }
+
+    private async Task CancelIntervention()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Annuler l'intervention",
+            "Êtes-vous sûr de vouloir annuler cette intervention ?",
+            yesText: "Oui", cancelText: "Non");
+
+        if (confirm == true)
+        {
+            var result = await InterventionService.CancelAsync(Id);
+            if (result.Success && result.Data != null)
+            {
+                // Update immediately with the data returned from the server
+                _intervention = result.Data;
+                StateHasChanged();
+                Snackbar.Add("Intervention annulée", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Erreur lors de l'annulation", Severity.Error);
+            }
+        }
+    }
+
+    private async Task GenerateInvoice()
+    {
+        var result = await InvoiceService.GenerateAsync(Id);
+        if (result.Success)
+        {
+            await LoadIntervention();
+            StateHasChanged();
+            Snackbar.Add("Facture générée", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(result.Message, Severity.Error);
+        }
+    }
+
+    private async Task DownloadInvoice()
+    {
+        if (_intervention?.InvoiceId != null)
+        {
+            var result = await InvoiceService.GetPdfAsync(_intervention.InvoiceId.Value);
+            if (result.Success && result.Data != null)
+            {
+                var base64Pdf = Convert.ToBase64String(result.Data);
+                await JS.InvokeVoidAsync("downloadFile", $"facture-{_intervention.InvoiceId.Value}.pdf", base64Pdf);
+            }
+            else
+            {
+                Snackbar.Add("PDF non disponible", Severity.Warning);
+            }
+        }
+    }
+
+    private string GetStatusBadgeClass(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "bg-info",
+        InterventionStatus.InProgress => "bg-warning",
+        InterventionStatus.Completed => "bg-success",
+        InterventionStatus.Cancelled => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusLabel(InterventionStatus status) => status switch
+    {
+        InterventionStatus.Planned => "Planifiée",
+        InterventionStatus.InProgress => "En cours",
+        InterventionStatus.Completed => "Terminée",
+        InterventionStatus.Cancelled => "Annulée",
+        _ => status.ToString()
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync("initFeatherIcons");
+    }
+
+}
