@@ -475,9 +475,7 @@ Ce projet est sous licence **MIT**. Voir le fichier `LICENSE` pour plus de déta
 
 ---
 
-## 👥 Auteurs
 
-- **Ahmed Khlif** - *Développement initial* - [@ahmedKhlif](https://github.com/ahmedKhlif)
 
 ---
 
